@@ -1,0 +1,8 @@
+#Each line must contain the following information:
+#    BED.filename: Path to a BED file that will be written containing all hits
+#    search.sequence(s): DNA sequence regex pattern that follows IUPAC nucleotide naming conventions.
+#        Separate multiple search sequences with a comma
+#    mismatches: Number of mismatches allowed in a matching sequence
+#        Separate multiple search sequences with a comma
+TSS_mask_up CGGG,ACAGG,ACGAG,ACGGA 0,0,0,0
+TES_mask_down AAAA,RRRRRRRRRRRRRRR 0,2
