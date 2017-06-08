@@ -5,4 +5,4 @@
 #    mismatches: Number of mismatches allowed in a matching sequence
 #        Separate multiple search sequences with a comma
 TSS_mask_up CGGG,ACAGG,ACGAG,ACGGA 0,0,0,0
-TES_mask_down AAAA,RRRRRRRRRRRRRRR 0,2
+#TES_mask_down AAAA,RRRRRRRRRRRRRRR 0,2

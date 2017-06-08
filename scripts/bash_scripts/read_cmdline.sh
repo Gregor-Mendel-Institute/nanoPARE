@@ -10,7 +10,7 @@ cat <<HELP
 ############
 # ENDGRAPH #
 ############
-Usage: bash endGraph.sh [options] -5 <bedgraph_plus> <bedgraph_minus> -B <bedgraph> [<bedgraph_minus>]
+Usage: ./endGraph.sh [options] -5 <bedgraph_plus> <bedgraph_minus> -B <bedgraph> [<bedgraph_minus>]
 
 This program interprets RNA-seq data from  transcript start site (TSS)
 or transcript end site (TES) data by modeling it against a background of gene body RNA-seq reads.
@@ -62,6 +62,8 @@ while [ "$1" != "" ]; do
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;
+    -S | --setup )              shift; SETUP=$1
+                                ;;                                
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;
     esac

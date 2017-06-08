@@ -1,27 +1,26 @@
 #!/bin/bash
 
-root_dir=/lustre/scratch/users/michael.schon/bookend
-bash_dir=/lustre/scratch/users/michael.schon/bookend/scripts/bash_scripts
-python_dir=/lustre/scratch/users/michael.schon/bookend/scripts/python_scripts
-r_dir=/lustre/scratch/users/michael.schon/bookend/scripts/r_scripts
-resource_dir=/lustre/scratch/users/michael.schon/bookend/resources
-temp_dir=/lustre/scratch/users/michael.schon/bookend/temp
-log_dir=/lustre/scratch/users/michael.schon/bookend/log
-results_dir=/lustre/scratch/users/michael.schon/bookend/results
+root_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph
+bash_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/scripts/bash_scripts
+python_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/scripts/python_scripts
+r_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/scripts/r_scripts
+resource_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources
+temp_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/temp
+log_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/log
+results_dir=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/results
 
-fastq_dir=/lustre/scratch/users/michael.schon/bookend/resources/fastq_files
-reference_table=/lustre/scratch/users/michael.schon/bookend/resources/reference.table
-genome_fasta=/lustre/scratch/users/michael.schon/bookend/resources/genome.fasta
-annotation_gff=/lustre/scratch/users/michael.schon/bookend/resources/annotation.gff
+genome_fasta=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/genome.fasta
+annotation_gff=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/annotation.gff
+TSS_PLUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/TSS_plus.bedgraph
+TSS_MINUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/TSS_minus.bedgraph
+TES_PLUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/TES_plus.bedgraph
+TES_MINUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/TES_minus.bedgraph
+BODY_PLUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/BODY_plus.bedgraph
+BODY_MINUS=/home/GMI/michael.schon/Desktop/lab/members/Schon/Writing/nanoPARE/EndGraph/resources/BODY_minus.bedgraph
 
-LMOD=1
-CPUS=1
-RAM=30
-ISPCR=AAGCAGTGGTATCAACGCAGAGTAC
-TN5_1=TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG
-TN5_2=GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
-
-PBS_P=rnaseq_nod
-PBS_q=workq
+LMOD=0
+SETUP=false
+ITERATIONS=5
+KERNEL=laplace
 
 

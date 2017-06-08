@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "#################"
+echo "################"
 echo "### ENDGRAPH ###"
 echo "################"
 echo " "
@@ -124,11 +124,11 @@ fi
 
 for strand in plus minus
 do
-    if [ $TSS = true]
+    if [ $TSS = true ]
     then
         python $python_dir/bedgraph_mask.py -B=TSS_"$strand".bedgraph -O=TSS_"$strand"_mask.bedgraph -L=$resource_dir/length.table -S=$strand -U=$resource_dir/TSS_mask_up.bed 
     fi
-    if [ $TES = true]
+    if [ $TES = true ]
     then
         python $python_dir/bedgraph_mask.py -B=TES_"$strand".bedgraph -O=TES_"$strand"_mask.bedgraph -L=$resource_dir/length.table -S=$strand -D=$resource_dir/TES_mask_down.bed
     fi
@@ -158,12 +158,12 @@ TES_scale=1
 TSS_bandwidth=50
 TES_bandwidth=50
 
-if [ $TSS = true]
+if [ $TSS = true ]
 then
     unionBedGraphs -i TSS_plus_mask.bedgraph BODY_minus.bedgraph | awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' > TSS_plus_subtract.bedgraph
     unionBedGraphs -i TSS_minus_mask.bedgraph BODY_plus.bedgraph | awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' > TSS_minus_subtract.bedgraph
 fi
-if [ $TES = true]
+if [ $TES = true ]
 then
     unionBedGraphs -i TES_plus_mask.bedgraph BODY_plus.bedgraph | awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' > TES_plus_subtract.bedgraph
     unionBedGraphs -i TES_minus_mask.bedgraph BODY_minus.bedgraph | awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' > TES_minus_subtract.bedgraph
@@ -189,7 +189,7 @@ then
                 echo $TSS_start $TSS_end | tr ' ' '\t' >> TSS_metaplot.tab
             done
             cp TSS_metaplot.tab TSS_metaplot_$run.tab
-            Rscript $r_dir/TSS_TES_scaling_factors.R metaplot_$run.tab > TSS_scaling_factors_$run.tab
+            Rscript $r_dir/TSS_TES_scaling_factors.R TSS_metaplot_$run.tab > TSS_scaling_factors_$run.tab
             TSS_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 TSS_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
             TSS_scale=$(echo $TSS_scales | bc)
             TSS_bandwidth=$(cut -d ' ' -f 2 TSS_scaling_factors_$run.tab)
@@ -212,7 +212,7 @@ then
                 echo $TES_start $TES_end | tr ' ' '\t' >> TES_metaplot.tab
             done
             cp TES_metaplot.tab TES_metaplot_$run.tab
-            Rscript $r_dir/TSS_TES_scaling_factors.R metaplot_$run.tab > TES_scaling_factors_$run.tab
+            Rscript $r_dir/TSS_TES_scaling_factors.R TSS_metaplot_$run.tab > TES_scaling_factors_$run.tab
             TES_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 TES_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
             TES_scale=$(echo $TES_scales | bc)
             TES_bandwidth=$(cut -d ' ' -f 2 TES_scaling_factors_$run.tab)

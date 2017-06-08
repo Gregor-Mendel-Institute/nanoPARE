@@ -6,8 +6,8 @@ if(length(arg)==1){
 }
 
 readtypes = c()
-if(grepl(arg[1],'TSS',fixed=T)){readtypes = append(readtypes,'TSS')}
-if(grepl(arg[1],'TES',fixed=T)){readtypes = append(readtypes,'TES')}
+if(grepl('TSS',arg[1],fixed=T)){readtypes = append(readtypes,'TSS')}
+if(grepl('TES',arg[1],fixed=T)){readtypes = append(readtypes,'TES')}
 
 bookend_colors=c(BODY="#808285",TSS="#1C75BC",TES="#BE1E2D")
 
