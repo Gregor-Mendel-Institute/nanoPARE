@@ -176,18 +176,14 @@ then
     do
         if [ $TSS = true ]
         then
-            TSS_start_plus=( $(python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table | tr '\n' ' ') )
-            TSS_start_minus=( $(python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table | tr '\n' ' ') )
-            TSS_end_plus=( $(python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table | tr '\n' ' ') )
-            TSS_end_minus=( $(python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table | tr '\n' ' ') )
-            rm -f TSS_metaplot.tab
-            touch TSS_metaplot.tab
-            for ((i=0;i<${#TSS_start_plus[@]};++i))
-            do
-                TSS_start=$(echo "scale=10; (${TSS_start_plus[$i]} + ${TSS_start_minus[$i]}) / 2 " | bc -l)
-                TSS_end=$(echo "scale=10; (${TSS_end_plus[$i]} + ${TSS_end_minus[$i]}) / 2 " | bc -l)
-                echo $TSS_start $TSS_end | tr ' ' '\t' >> TSS_metaplot.tab
-            done
+            python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > TSS_start_plus.meta
+            python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > TSS_start_minus.meta
+            python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > TSS_end_plus.meta
+            python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > TSS_end_minus.meta
+
+            paste TSS_start_plus.meta TSS_start_minus.meta TSS_end_plus.meta TSS_end_minus.meta | awk '{printf "%.8f %.8f\n", ($1+$2)/2, ($3+$4)/2}' > TSS_TES_metaplot.tab
+            rm TSS_start_plus.meta TSS_start_minus.meta TSS_end_plus.meta TSS_end_minus.meta
+
             cp TSS_metaplot.tab TSS_metaplot_$run.tab
             Rscript $r_dir/TSS_TES_scaling_factors.R TSS_metaplot_$run.tab > TSS_scaling_factors_$run.tab
             TSS_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 TSS_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
