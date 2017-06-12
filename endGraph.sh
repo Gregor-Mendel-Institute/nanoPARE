@@ -1,10 +1,5 @@
 #!/bin/bash
 
-echo "################"
-echo "### ENDGRAPH ###"
-echo "################"
-echo " "
-
 ################
 # CONFIG SETUP #
 ################
@@ -41,6 +36,11 @@ KERNEL='laplace'
 . $bash_dir/read_cmdline.sh
 . $bash_dir/write_config.sh
 
+
+echo "################"
+echo "### ENDGRAPH ###"
+echo "################"
+echo " "
 echo "Config settings:"
 cat $resource_dir/config_file.sh
 

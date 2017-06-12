@@ -42,6 +42,10 @@ HELP
 # READING THE COMMAND LINE #
 ############################
 
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+fi
 while [ "$1" != "" ]; do
     case $1 in
     -h | --help )               usage; exit 1
