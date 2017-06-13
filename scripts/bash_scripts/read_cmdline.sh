@@ -16,6 +16,7 @@ This program interprets RNA-seq data from  transcript start site (TSS)
 or transcript end site (TES) data by modeling it against a background of gene body RNA-seq reads.
 
 Arguments:
+-N | --name          Sample name (string, default = "sample")
 -5 | --tss | --5p    Paths to two BEDGRAPH files of 5' end reads on both strands of the reference genome
 -3 | --tes | --3p    Paths to two BEDGRAPH files of 3' end reads on both strands of the reference genome
 -B | --body | --neg  Path(s) to BEDGRAPH file(s) of locations of gene body reads (on both strands) of the reference genome
@@ -50,11 +51,13 @@ while [ "$1" != "" ]; do
     case $1 in
     -h | --help )               usage; exit 1
                                 ;;
+    -N | --name )               shift; SAMPLE_NAME=$1;
+                                ;;
     -5 | --tss | --5p )         shift; TSS_PLUS=$1; shift; TSS_MINUS=$1 
                                 ;;
     -3 | --tes | --3p )         shift; TES_PLUS=$1; shift; TES_MINUS=$1 
                                 ;;
-    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ "${$2:0:1}" == "-" ]; then shift; BODY_MINUS=$1; fi 
+    -B | --body | --neg )       shift; BODY_PLUS=$1; if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi 
                                 ;;
     -G | --genome )             shift; genome_fasta=$1
                                 ;;

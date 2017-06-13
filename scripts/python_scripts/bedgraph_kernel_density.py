@@ -10,7 +10,7 @@ Commandline arguments:\n\
     -B=[input bedgraph]           (required filepath)\n\
     -O=[output bedgraph]          (required filepath)\n\
     -L=[lengths table]            (required filepath; output from fasta_lengths.py)\n\
-    -K=[kernel function]          (default: gaussian; options: gaussian|normal, uniform , triangle)\n\
+    -K=[kernel function]          (default: gaussian; options: gaussian|normal, laplace|folded, uniform , triangle)\n\
     -H=[bandwidth]                (default: 50; options: integer)\n\
     -S=[sigma value]              (default: 5; options: 1-6)\n\
     -D=[significant digits]       (default: 4; options: integer)\n\
@@ -73,15 +73,23 @@ The density function to use is defined by 'd_fun'. Options:
     Uniform  - Every position in [center-bandwidth : center+bandwidth+1] is given an equal value such that sum(positions) = 1
     Triangle - Center-weighted symmetric triangular distribution.
 '''
+
 def gauss(x,s):
     return math.exp(-float(x)**2/(2.0*float(s)**2))/(math.sqrt(2.0*math.pi)*s)
+    
 def laplace(x,s,m=0):
     return math.exp(-abs(float(x)-m)/s)/(2*s)
+    
+def which(x,value=True):
+    return [a for a,b in enumerate(x) if b==value]
+    
+def notwhich(x,value=0):
+    return [a for a,b in enumerate(x) if b!=value]
     
 if KERNEL.lower() in ['gauss','gaussian','normal','norm']:
     k = [gauss(i,BANDWIDTH) for i in range(-BANDWIDTH*SIGMA,BANDWIDTH*SIGMA+1)]
     k_len = len(k)
-if KERNEL.lower() in ['laplace','fold','folded','mountain']:
+elif KERNEL.lower() in ['laplace','fold','folded','mountain']:
     k = [laplace(i,BANDWIDTH) for i in range(-BANDWIDTH*SIGMA,BANDWIDTH*SIGMA+1)]
     k_len = len(k)
 elif KERNEL.lower() in ['uniform','flat']:
@@ -145,7 +153,18 @@ for chrom,chromlen in sorted(list(chromosomes.items())):
             if l<0 or l>=chromlen:
                 continue
             smoothed_coverage[chrom][l] += v
-    smoothed_nonempty=[(loc,round(val,DIGITS)) for loc,val in zip(range(chromlen),smoothed_coverage[chrom]) if round(val,DIGITS)!=0]
-    for loc,val in smoothed_nonempty:
-        outfile.write('\t'.join([chrom,str(loc),str(loc+1),str(val)])+'\n')
+    del coverage[chrom]
+    if only_positive:
+        smooth_round = [round(i,DIGITS) if round(i,DIGITS)>0 else False for i in smoothed_coverage[chrom]]
+    else:
+        smooth_round = [round(i,DIGITS) if round(i,DIGITS)!=0 else False for i in smoothed_coverage[chrom]]
+    del smoothed_coverage[chrom]
+    edges = [smooth_round[0]]+[i-j for i,j in zip(smooth_round[1:],smooth_round[:chromlen])]
+    diff  = notwhich(edges)
+    del edges
+    diffpairs = zip(diff,diff[1:])
+    del diff
+    for locs,val in zip(diffpairs,[smooth_round[i[0]] for i in diffpairs]):
+        if val != 0:
+            outfile.write('\t'.join([chrom,str(locs[0]),str(locs[1]),str(val)])+'\n')
 outfile.close()
