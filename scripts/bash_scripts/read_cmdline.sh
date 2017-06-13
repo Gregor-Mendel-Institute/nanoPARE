@@ -53,6 +53,8 @@ while [ "$1" != "" ]; do
                                 ;;
     -S | --setup )              SETUP=true
                                 ;;                                
+    --lmod )                    LMOD=1
+                                ;;
     -N | --name )               shift; SAMPLE_NAME=$1;
                                 ;;
     -5 | --tss | --5p )         shift; TSS_PLUS=$1; shift; TSS_MINUS=$1 
@@ -63,13 +65,11 @@ while [ "$1" != "" ]; do
                                 ;;
     -A | --annotation )         shift; annotation_gff=$1
                                 ;;
-    --lmod )                    LMOD=1
-                                ;;
     -I | --iter )               shift; ITERATIONS=$1
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;
-    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ ! -z $2 ]; then if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi; fi 
+    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ "$2" != "" ]; then if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi; fi 
                                 ;;
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;
