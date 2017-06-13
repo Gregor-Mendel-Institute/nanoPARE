@@ -37,15 +37,13 @@ KERNEL='laplace'
 . $bash_dir/read_cmdline.sh
 temp_dir=$temp_dir/$SAMPLE_NAME
 mkdir -p $temp_dir
-. $bash_dir/write_config.sh
-
 
 echo "################"
 echo "### ENDGRAPH ###"
 echo "################"
 echo " "
 echo "Config settings:"
-cat $resource_dir/config_file.sh
+. $bash_dir/list_settings.sh
 
 
 # Environment modules to load with Lmod (if option --lmod is passed)

@@ -1,10 +1,6 @@
 #!/bin/bash
 
-################
-# CONFIG SETUP #
-################
-echo "#!/bin/bash
-
+echo "
 root_dir="$root_dir"
 bash_dir="$bash_dir"
 python_dir="$python_dir"
@@ -28,4 +24,4 @@ SETUP="$SETUP"
 ITERATIONS="$ITERATIONS"
 KERNEL="$KERNEL"
 
-" > $resource_dir/config_file.sh
+"
