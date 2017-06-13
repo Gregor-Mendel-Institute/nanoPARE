@@ -51,26 +51,26 @@ while [ "$1" != "" ]; do
     case $1 in
     -h | --help )               usage; exit 1
                                 ;;
+    -S | --setup )              SETUP=true; shift
+                                ;;                                
     -N | --name )               shift; SAMPLE_NAME=$1;
                                 ;;
     -5 | --tss | --5p )         shift; TSS_PLUS=$1; shift; TSS_MINUS=$1 
                                 ;;
     -3 | --tes | --3p )         shift; TES_PLUS=$1; shift; TES_MINUS=$1 
                                 ;;
-    -B | --body | --neg )       shift; BODY_PLUS=$1; if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi 
-                                ;;
     -G | --genome )             shift; genome_fasta=$1
                                 ;;
     -A | --annotation )         shift; annotation_gff=$1
                                 ;;
-    --lmod )                    LMOD=1
+    --lmod )                    LMOD=1; shift
                                 ;;
     -I | --iter )               shift; ITERATIONS=$1
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;
-    -S | --setup )              SETUP=true; shift
-                                ;;                                
+    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ ! -z $2 ]; then if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi; fi 
+                                ;;
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;
     esac
