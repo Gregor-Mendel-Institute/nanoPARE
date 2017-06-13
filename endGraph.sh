@@ -24,7 +24,7 @@ BODY_PLUS=$resource_dir/BODY_plus.bedgraph
 BODY_MINUS=$resource_dir/BODY_minus.bedgraph
 
 SAMPLE_NAME="sample"
-LMOD=1
+LMOD=0
 SETUP=false
 ITERATIONS=5
 KERNEL='laplace'

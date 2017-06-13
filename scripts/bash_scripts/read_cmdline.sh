@@ -69,7 +69,7 @@ while [ "$1" != "" ]; do
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;
-    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ "$2" != "" ]; then if [[ ${$2:0:1} != "-" ]]; then shift; BODY_MINUS=$1; fi; fi 
+    -B | --body | --neg )       shift; BODY_PLUS=$1; if [ "$2" != "" ]; then if [[ "$2" != -* ]]; then shift; BODY_MINUS=$1; fi; fi
                                 ;;
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;
