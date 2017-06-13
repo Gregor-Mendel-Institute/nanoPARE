@@ -69,7 +69,7 @@ while [ "$1" != "" ]; do
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;
-    -S | --setup )              shift; SETUP=$1
+    -S | --setup )              SETUP=true; shift
                                 ;;                                
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;

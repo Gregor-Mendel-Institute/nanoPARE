@@ -14,6 +14,7 @@ Commandline arguments:\n\
     -H=[bandwidth]                (default: 50; options: integer)\n\
     -S=[sigma value]              (default: 5; options: 1-6)\n\
     -D=[significant digits]       (default: 4; options: integer)\n\
+    -P=[only positive values]     (default: FALSE)\n\
 \n\
 Any values immediately upstream of -U or downstream of -D will be set to zero.\n\
 This can be used to mask sequence-specific artifacts, like TSO strand invasion or oligo-dT mispriming.\
@@ -23,6 +24,7 @@ KERNEL    = 'laplace'
 BANDWIDTH = 50
 SIGMA     = 5
 DIGITS    = 3
+ONLY_POSITIVE = False
 
 if len(sys.argv) < 3:
     print(usage)
@@ -34,13 +36,14 @@ for arg in args:
         print(usage)
         sys.exit()
     option,value=arg.split('=')
-    if option == '-B':   BEDGRAPH_IN  = value
-    elif option == '-O': BEDGRAPH_OUT = value
-    elif option == '-L': LENGTHS      = value
-    elif option == '-K': KERNEL       = value
-    elif option == '-H': BANDWIDTH    = int(value)
-    elif option == '-S': SIGMA        = int(value)
-    elif option == '-D': DIGITS       = int(value)
+    if option == '-B':   BEDGRAPH_IN   = value
+    elif option == '-O': BEDGRAPH_OUT  = value
+    elif option == '-L': LENGTHS       = value
+    elif option == '-K': KERNEL        = value
+    elif option == '-H': BANDWIDTH     = int(value)
+    elif option == '-S': SIGMA         = int(value)
+    elif option == '-D': DIGITS        = int(value)
+    elif option == '-P': ONLY_POSITIVE = bool(value)
 if 'BEDGRAPH_IN' not in globals():
     print("ERROR: missing required argument -B=[input bedgraph]")
     print(usage)
@@ -154,7 +157,7 @@ for chrom,chromlen in sorted(list(chromosomes.items())):
                 continue
             smoothed_coverage[chrom][l] += v
     del coverage[chrom]
-    if only_positive:
+    if ONLY_POSITIVE:
         smooth_round = [round(i,DIGITS) if round(i,DIGITS)>0 else False for i in smoothed_coverage[chrom]]
     else:
         smooth_round = [round(i,DIGITS) if round(i,DIGITS)!=0 else False for i in smoothed_coverage[chrom]]

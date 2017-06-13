@@ -1,10 +1,13 @@
-args = commandArgs(trailingOnly=TRUE)
-if(length(args)==1){
-  metaplot_file = args[1]
+arg = commandArgs(trailingOnly=TRUE)
+if(length(arg)==1){
+  metaplot_file = arg[1]
 }else{
   metaplot_file = 'TSS_TES_metaplot.tab'
 }
 
+readtypes = c()
+if(grepl('TSS',arg[1],fixed=T)){readtypes = append(readtypes,'TSS')}
+if(grepl('TES',arg[1],fixed=T)){readtypes = append(readtypes,'TES')}
 bookend_colors=c(BODY="#808285",TSS="#1C75BC",TES="#BE1E2D")
 
 auc=function(x)sum(x[which(x>0)])
@@ -23,14 +26,19 @@ calculate_scalefactor=function(value_vector,maxpoint,direction='both'){
 }
 
 metaplot_table=read.table(metaplot_file,header = F,stringsAsFactors = F)
-colnames(metaplot_table)=c('TSS_start','TSS_end','TES_start','TES_end')
+colnames(metaplot_table)=paste(rep(readtypes,each=2),rep(c('start','end'),length(readtypes)),sep='_')
+
 midpoint=floor(nrow(metaplot_table)/2)
 overall_maxpoint=max(abs(metaplot_table))
 
-pdf('TSS_TES_metaplot.pdf',useDingbats = F)
+pdf(paste(paste(readtypes,collapse='_'),'_metaplot.pdf',sep=''),useDingbats = F)
+if(length(readtypes)==2){
 par(mfrow=c(2,2),mar=c(4,4,3,2))
+}else{
+par(mfrow=c(1,2),mar=c(4,4,3,2))
+}
 minuscolor = bookend_colors['BODY']
-for(readtype in c('TSS','TES')){
+for(readtype in readtypes){
 for(side in c('start','end')){
 pluscolor = bookend_colors[readtype]
 score=metaplot_table[,paste(readtype,side,sep='_')]
@@ -52,7 +60,7 @@ abline(h=0,lty=1)
 abline(v=midpoint,lty=3)
 }
 }
-dev.off()
+trash <- dev.off()
 
 
 
