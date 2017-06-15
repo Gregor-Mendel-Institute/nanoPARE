@@ -13,6 +13,7 @@ Commandline arguments:\n\
     -T=[threshold]                (default: 0; number)\n\
     -M=[minimum feature length]   (default: 10; positive integer)\n\
     -V=[value type]               (default: sum; options: sum, max, mean)\n\
+    -MV=[minimum value]           (default: 0; options: number)\n\
     -S=[strand]                   (default: both; options: both|. , plus|p|+ , minus|m|-)\n\
 \n\
 Any values immediately upstream of -U or downstream of -D will be set to zero.\n\
@@ -22,6 +23,7 @@ This can be used to mask sequence-specific artifacts, like TSO strand invasion o
 THRESHOLD = 0
 MINIMUM   = 10
 VALUE     = 'sum'
+MINVAL    = 0
 STRAND    = 'both'
 
 if len(sys.argv) < 3:
@@ -41,6 +43,7 @@ for arg in args:
     elif option == '-M': MINIMUM     = int(value)
     elif option == '-V': VALUE       = value
     elif option == '-S': STRAND      = value
+    elif option == '-MV': MINVAL     = float(value)
 if 'BEDGRAPH_IN' not in globals():
     print("ERROR: missing required argument -B=[input bedgraph]")
     print(usage)
@@ -127,11 +130,12 @@ for chrom,chromlen in sorted(list(chromosomes.items())):
     edges  = [int(thresh_coverage[chrom][0])]+[i-j for i,j in zip(thresh_coverage[chrom][1:],thresh_coverage[chrom][:chromlen])]
     starts = which(edges,1)
     ends   = which(edges,-1)
-    assert len(starts) == len(ends)
+    if len(starts) > len(ends):
+        ends += chromlen
     for chromStart,chromEnd in zip(starts,ends):
         if chromEnd-chromStart >= MINIMUM:
-            featurecount+=1
-            name='thresh.'+str(featurecount)
+            featurecount += 1
+            name = 'thresh.'+str(featurecount)
             coverage_subset = coverage[chrom][chromStart:chromEnd+1]
             if VALUE == 'sum':
                 signalValue = sum(coverage_subset)
@@ -139,6 +143,8 @@ for chrom,chromlen in sorted(list(chromosomes.items())):
                 signalValue = sum(coverage_subset)/len(coverage_subset)
             elif VALUE == 'max':
                 signalValue = max(coverage_subset)
+            if signalValue < MINVAL:
+                continue
             peak_positions = which(coverage_subset,max(coverage_subset))
             peak = int(sum(peak_positions)/len(peak_positions))
             outfile.write('\t'.join([str(i) for i in [chrom,chromStart,chromEnd,name,0,STRAND,signalValue,-1,-1,peak]])+'\n')
