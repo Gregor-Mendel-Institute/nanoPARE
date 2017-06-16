@@ -165,16 +165,16 @@ TES_bandwidth=50
 if [ $TSS = true ]
 then
     unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-    awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
+    awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
     unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-    awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
+    awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
 fi
 if [ $TES = true ]
 then
     unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-    awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
+    awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
     unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-    awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/mult-$5*mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
+    awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
 fi
 
 if [ $ITERATIONS -ge 1 ]
@@ -199,9 +199,9 @@ then
             TSS_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TSS_scaling_factors_$run.tab)
             echo "TSS_run_$run $TSS_scale $TSS_bandwidth"
             unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-            awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/(1+((mult-1)/2))-$5*(1+((mult-1)/2))"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
+            awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
             unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-            awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4/(1+((mult-1)/2))-$5*(1+((mult-1)/2))"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
+            awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
         fi
         if [ $TES = true ]
         then
@@ -220,9 +220,9 @@ then
             TES_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TES_scaling_factors_$run.tab)
             echo "TES_run_$run $TES_scale $TES_bandwidth"
             unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-            awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/(1+((mult-1)/2))-$5*(1+((mult-1)/2))"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
+            awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
             unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-            awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4/(1+((mult-1)/2))-$5*(1+((mult-1)/2))"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
+            awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
         fi
     done
 fi
