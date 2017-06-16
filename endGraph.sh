@@ -252,8 +252,10 @@ do
     if [ $readtype == 'TSS' ]
     then
         bandwidth=$TSS_bandwidth
+        sf=$TSS_scale
     else
         bandwidth=$TES_bandwidth
+        sf=$TES_scale
     fi
     for strand in plus minus
     do
@@ -266,6 +268,7 @@ do
         -H=$bandwidth \
         -S=5 \
         -D=3 \
+        -MV=$sf \
         -P=True"
         echo $kernel_density_command
         eval $kernel_density_command
@@ -282,6 +285,7 @@ do
         -T=0 \
         -M=10 \
         -V=sum \
+        -MV=$sf \
         -S=$strand"
         echo $feature_threshold_command
         eval $feature_threshold_command
