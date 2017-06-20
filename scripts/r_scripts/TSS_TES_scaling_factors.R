@@ -38,16 +38,18 @@ overall_maxpoint=max(abs(metaplot_table))
 if('TSS'%in%readtypes){
 	opt_direction=1>auc(metaplot_table[,"TSS_start"])
 	maxpoint=max(abs(metaplot_table[,"TSS_start"]))
+	minpoint=min(metaplot_table[,"TSS_start"])
 	TSS_optimum = calculate_scalefactor(metaplot_table[,"TSS_start"],maxpoint,opt_direction)
-	TSS_scaling_factor = sum(metaplot_table[,"TSS_start"]-TSS_optimum) / sum(metaplot_table[,"TSS_start"])
+	TSS_scaling_factor = sum(metaplot_table[,"TSS_start"]-minpoint+TSS_optimum) / sum(metaplot_table[,"TSS_start"]-minpoint)
 	TSS_bandwidth      = min(which(sapply(1:midpoint,function(x)auc(metaplot_table[(midpoint-x):(midpoint+x),"TSS_start"]+TSS_optimum))>=0.6826))
 	cat(paste(c(TSS_scaling_factor,' ',TSS_bandwidth,' '),collapse=''))
 }
 if('TES'%in%readtypes){
 	opt_direction=1>auc(metaplot_table[,"TES_end"])
 	maxpoint=max(abs(metaplot_table[,"TES_end"]))
+	minpoint=min(metaplot_table[,"TES_end"])
 	TES_optimum = calculate_scalefactor(metaplot_table[,"TES_end"],maxpoint,opt_direction)
-	TES_scaling_factor = sum(metaplot_table[,"TES_end"]-TES_optimum) / sum(metaplot_table[,"TES_end"])
+	TES_scaling_factor = sum(metaplot_table[,"TES_end"]-minpoint+TES_optimum) / sum(metaplot_table[,"TES_end"]-minpoint)
 	TES_bandwidth      = min(which(sapply(1:midpoint,function(x)auc(metaplot_table[(midpoint-x):(midpoint+x),"TES_end"]+TES_optimum))>=0.6826))
 	cat(paste(c(TES_scaling_factor,' ',TES_bandwidth,' '),collapse=''))
 }
