@@ -28,7 +28,7 @@ LMOD=0
 SETUP=false
 ITERATIONS=10
 KERNEL='laplace'
-APPROACH=0.5
+APPROACH=1
 
 ############################
 # READING THE COMMAND LINE #
@@ -158,8 +158,8 @@ echo " "
 # 
 # Rebuilds subtractive bedgraph files with the appropriate scaling factor
 
-TSS_scale=10000
-TES_scale=10000
+TSS_sf=10000
+TES_sf=10000
 TSS_bandwidth=50
 TES_bandwidth=50
 TSS_optimized="false"
@@ -199,7 +199,7 @@ then
             paste $temp_dir/TSS_start_plus.meta $temp_dir/TSS_start_minus.meta $temp_dir/TSS_end_plus.meta $temp_dir/TSS_end_minus.meta | awk '{printf "%.8f %.8f\n", ($1+$2)/2, ($3+$4)/2}' > $temp_dir/TSS_metaplot.tab
             cp $temp_dir/TSS_metaplot.tab $temp_dir/TSS_metaplot_$run.tab
             Rscript $r_dir/TSS_TES_scaling_factors.R $temp_dir/TSS_metaplot_$run.tab > $temp_dir/TSS_scaling_factors_$run.tab
-            TSS_prev=$TSS_scale
+            TSS_prev=$TSS_sf
             if [ $run -le $optimal_TSS_run ]
             then
                 TSS_sf=$(cut -d ' ' -f 1 $temp_dir/TSS_scaling_factors_$run.tab)
@@ -231,7 +231,7 @@ then
             paste $temp_dir/TES_start_plus.meta $temp_dir/TES_start_minus.meta $temp_dir/TES_end_plus.meta $temp_dir/TES_end_minus.meta | awk '{printf "%.8f %.8f\n", ($1+$2)/2, ($3+$4)/2}' > $temp_dir/TES_metaplot.tab
             cp $temp_dir/TES_metaplot.tab $temp_dir/TES_metaplot_$run.tab
             Rscript $r_dir/TSS_TES_scaling_factors.R $temp_dir/TES_metaplot_$run.tab > $temp_dir/TES_scaling_factors_$run.tab
-            TES_prev=$TES_scale
+            TES_prev=$TES_sf
             if [ $run -le $optimal_TES_run ]
             then
                 TES_sf=$(cut -d ' ' -f 1 $temp_dir/TES_scaling_factors_$run.tab)
