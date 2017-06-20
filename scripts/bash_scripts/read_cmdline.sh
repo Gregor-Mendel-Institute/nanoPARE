@@ -25,6 +25,7 @@ Arguments:
 -I | --iter          Number of iterations of optimization (default = 5)
 -K | --kernel        Kernel function (default = laplace; options: laplace, normal, flat, triangle)
 -S | --setup         If true, performs full environment setup (default = true)
+--approach           Approach speed during iterative optimization (default = 0.5; options: 0 < x <= 1)
 --lmod               Load required modules with Lmod
 
 Each of the above files is required to run Bookend. By default, each option points to an item in the resources directory:
@@ -54,6 +55,8 @@ while [ "$1" != "" ]; do
     -S | --setup )              SETUP=true
                                 ;;                                
     --lmod )                    LMOD=1
+                                ;;
+    --approach )                shift; APPROACH=$1
                                 ;;
     -N | --name )               shift; SAMPLE_NAME=$1;
                                 ;;
