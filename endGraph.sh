@@ -202,7 +202,7 @@ then
             TSS_prev=$TSS_scale
             if [ $run -le $optimal_TSS_run ]
             then
-                TSS_sf=$(cut -d ' ' -f 1 TSS_scaling_factors_$run.tab)
+                TSS_sf=$(cut -d ' ' -f 1 $temp_dir/TSS_scaling_factors_$run.tab)
                 TSS_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 $temp_dir/TSS_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
                 TSS_scale=$(echo "1-((1-$TSS_scales)*$APPROACH)" | bc -l)
                 TSS_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TSS_scaling_factors_$run.tab)
@@ -234,7 +234,7 @@ then
             TES_prev=$TES_scale
             if [ $run -le $optimal_TES_run ]
             then
-                TES_sf=$(cut -d ' ' -f 1 TES_scaling_factors_$run.tab)
+                TES_sf=$(cut -d ' ' -f 1 $temp_dir/TES_scaling_factors_$run.tab)
                 TES_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 $temp_dir/TES_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
                 TES_scale=$(echo "1-((1-$TES_scales)*$APPROACH)" | bc -l)
                 TES_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TES_scaling_factors_$run.tab)
