@@ -145,6 +145,8 @@ for chrom,chromlen in sorted(list(chromosomes.items())):
                 signalValue = max(coverage_subset)
             if signalValue < MINVAL:
                 continue
+            if MINVAL > 0:
+                signalValue = signalValue/MINVAL
             peak_positions = which(coverage_subset,max(coverage_subset))
             peak = int(sum(peak_positions)/len(peak_positions))
             outfile.write('\t'.join([str(i) for i in [chrom,chromStart,chromEnd,name,0,STRAND,signalValue,-1,-1,peak]])+'\n')
