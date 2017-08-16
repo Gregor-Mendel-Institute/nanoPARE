@@ -11,6 +11,8 @@ Commandline arguments:\n\
     -F=[feature type]             (default: gene; options: any string)\n\
     -V=[vertical normalization]   (default: norm; options: max,mean,norm)\n\
     -H=[horizontal normalization] (default: left; options: left,right,center,stretch<int>)\n\
+    -M=[max length]               (default: 1000; options: int)\n\
+    -A=[add length]               (default: 0; options: int)\n\
 \n\
 This vector of values will grow in size over time based on the rule provided in -H:\n\
     left:         left-aligned\n\
@@ -28,6 +30,8 @@ STRAND     = 'both'
 FEATURE    = 'gene'
 VERTICAL   = 'norm'
 HORIZONTAL = 'left'
+MAXLEN     = 2000
+ADDLEN     = 0
 
 if len(sys.argv) < 2:
     print(usage)
@@ -46,6 +50,8 @@ for arg in args:
     elif option == '-F': FEATURE     = value
     elif option == '-V': VERTICAL    = value
     elif option == '-H': HORIZONTAL  = value
+    elif option == '-M': MAXLEN      = int(value)
+    elif option == '-A': ADDLEN      = int(value)
 if 'BEDGRAPH_IN' not in globals():
     print("ERROR: missing required argument -B=[input bedgraph]")
     print(usage)
@@ -83,7 +89,9 @@ for line in coverage_file:
     count = float(count)
     for i in range(int(start),int(end)):
         coverage[chrom][i] = count
-
+if VERTICAL.lower() == 'rpm':
+    million_counts = sum([sum(coverage[i]) for i in chromosomes.keys()])*(10**-6)
+        
 '''
 Begins reading the input GFF file and extracting the features of type -F.
 'value_vector' is the set of running values that are aggregated.
@@ -131,21 +139,23 @@ for line in gff:
         sys.exit()
     elif HORIZONTAL == 'left':
         if veclen >= newlen:
-            value_vector = [a+b for a,b in zip(value_vector,line_values+[0]*(veclen-newlen))]
+            value_vector = [a+b for a,b in zip(value_vector,line_values+[0]*(veclen-newlen))][:MAXLEN]
         else:
-            value_vector = [a+b for a,b in zip(value_vector+[0]*(newlen-veclen),line_values)]
+            value_vector = [a+b for a,b in zip(value_vector+[0]*(newlen-veclen),line_values)][:MAXLEN]
     elif HORIZONTAL == 'right':
         if veclen >= newlen:
-            value_vector = [a+b for a,b in zip(value_vector,[0]*(veclen-newlen)+line_values)]
+            value_vector = [a+b for a,b in zip(value_vector,[0]*(veclen-newlen)+line_values)][-MAXLEN:]
         else:
-            value_vector = [a+b for a,b in zip([0]*(newlen-veclen)+value_vector,line_values)]
+            value_vector = [a+b for a,b in zip([0]*(newlen-veclen)+value_vector,line_values)][-MAXLEN:]
     elif HORIZONTAL == 'center':
         print('Error: center-align not yet implemented')
         sys.exit()
     featurecount+=1
 if VERTICAL in ['mean','norm']:
     value_vector = [i/featurecount for i in value_vector]
-
+if VERTICAL.lower() == 'rpm':
+    value_vector = [i/million_counts for i in value_vector]
+    
 for v in value_vector:
     print('{:.10f}'.format(v))
 

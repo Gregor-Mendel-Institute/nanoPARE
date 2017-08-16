@@ -11,6 +11,7 @@ Commandline arguments:\n\
     -S=[strand]                   (default: both; options: both|. , plus|+ , minus|-)\n\
     -U=[upstream BED mask]        (filepath)\n\
     -D=[downstream BED mask]      (filepath)\n\
+    -I=[inside BED mask]          (filepath)\n\
 \n\
 Any values immediately upstream of -U or downstream of -D will be set to zero.\n\
 This can be used to mask sequence-specific artifacts, like TSO strand invasion or oligo-dT mispriming.\
@@ -18,6 +19,7 @@ This can be used to mask sequence-specific artifacts, like TSO strand invasion o
 
 BED_UP   = 'none'
 BED_DOWN = 'none'
+BED_IN   = 'none'
 STRAND   = 'both'
 
 if len(sys.argv) < 3:
@@ -35,6 +37,7 @@ for arg in args:
     elif option == '-L': LENGTHS      = value
     elif option == '-S': STRAND       = value
     elif option == '-U': BED_UP       = value
+    elif option == '-I': BED_IN       = value
     elif option == '-D': BED_DOWN     = value
 if 'BEDGRAPH_IN' not in globals():
     print("ERROR: missing required argument -B=[input bedgraph]")
@@ -83,9 +86,9 @@ if BED_UP != 'none':
         end_pos=int(l[2])
         strand = l[5]
         if strand=='+':
-            mask_positions[chrom][strand].add(end_pos)
+            mask_positions[chrom][strand] |= end_pos
         elif strand=='-':
-            mask_positions[chrom][strand].add(start_pos-1)
+            mask_positions[chrom][strand] |= start_pos-1
     mask_file.close()
 
 if BED_DOWN != 'none':
@@ -104,6 +107,19 @@ if BED_DOWN != 'none':
             mask_positions[chrom][strand].add(end_pos)
     mask_file.close()
 
+if BED_IN != 'none':
+    print('Upstream mask: '+BED_IN)
+    mask_file=open(BED_IN)    
+    for line in mask_file:
+        if line[0]=='#':continue
+        l=line.rstrip().split()
+        chrom=l[0]
+        start_pos=int(l[1])
+        end_pos=int(l[2])
+        strand = l[5]
+        mask_positions[chrom][strand] |= set(range(start_pos,end_pos))
+    mask_file.close()
+    
 bedgraph_file=open(BEDGRAPH_IN)
 bedgraph_outfile=open(BEDGRAPH_OUT,'w')
 
