@@ -86,9 +86,9 @@ if BED_UP != 'none':
         end_pos=int(l[2])
         strand = l[5]
         if strand=='+':
-            mask_positions[chrom][strand] |= end_pos
+            mask_positions[chrom][strand].add(end_pos)
         elif strand=='-':
-            mask_positions[chrom][strand] |= start_pos-1
+            mask_positions[chrom][strand].add(start_pos-1)
     mask_file.close()
 
 if BED_DOWN != 'none':
@@ -117,7 +117,7 @@ if BED_IN != 'none':
         start_pos=int(l[1])
         end_pos=int(l[2])
         strand = l[5]
-        mask_positions[chrom][strand] |= set(range(start_pos,end_pos))
+        mask_positions[chrom][strand].update(set(range(start_pos,end_pos)))
     mask_file.close()
     
 bedgraph_file=open(BEDGRAPH_IN)
