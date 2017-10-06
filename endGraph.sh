@@ -26,14 +26,13 @@ BODY_MINUS=$resource_dir/BODY_minus.bedgraph
 SAMPLE_NAME="sample"
 LMOD=0
 SETUP=false
-ITERATIONS=10
 KERNEL='laplace'
-APPROACH=1
 
 ############################
 # READING THE COMMAND LINE #
 ############################
-# Taking the default variables above, modifying them with the commandline arguments (see read_cmdline.sh), and writing a config file
+# Taking the default variables above, modifying them with the commandline 
+# arguments (see read_cmdline.sh), and writing a config file
 
 . $bash_dir/read_cmdline.sh
 temp_dir=$temp_dir/$SAMPLE_NAME
@@ -48,7 +47,7 @@ echo "Config settings:"
 
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools --r )
+REQUIRED_MODULES=( --bedtools )
 . $bash_dir/load_modules.sh
 echo " "
 
@@ -64,29 +63,10 @@ then
     eval "$length_table_command"
     echo "Length table generated."
 
-    # A GFF file of features centered around TSS, and a separate GFF file for TES.
-    TSS_GFF_command="python \
-    $python_dir/gff_feature_ends.py \
-    -I=$annotation_gff \
-    -O=$resource_dir/TSS_sites.gff \
-    -E=TSS \
-    -D=500 \
-    -F=gene"
-    echo "$TSS_GFF_command"
-    eval "$TSS_GFF_command"
-
-    TES_GFF_command="python \
-    $python_dir/gff_feature_ends.py \
-    -I=$annotation_gff \
-    -O=$resource_dir/TES_sites.gff \
-    -E=TES \
-    -D=500 \
-    -F=gene"
-    echo "$TES_GFF_command"
-    eval "$TES_GFF_command"
-    echo "TSS and TES GFF files generated."
-
-    python $python_dir/fasta_sequence_search.py $genome_fasta $resource_dir/mask_sequences.table $resource_dir
+    python $python_dir/fasta_sequence_search.py \
+        $genome_fasta \
+        $resource_dir/mask_sequences.table \
+        $resource_dir
     echo "Masking BED files generated."
     echo "Setup complete."
     exit 0
@@ -98,10 +78,14 @@ echo "#########################################"
 echo "### STEP 1: BEDGRAPH ARTIFACT MASKING ###"
 echo "#########################################"
 echo " "
-# Generates a list of BED features indicating sites in the genome where TSS or TES reads are likely methodological artifacts:
-#     TSO oligos perform strand invasion at internal sites complementary to their 3' ends (Tang et al. 2012, Nucleic Acids Research)
-#     oligo(dT) priming results in internal priming artifacts at templated A-rich regions of transcripts
-# Customize what sequences are masked by editing /resources/mask_sequences.table
+# Generates a list of BED features indicating sites in the genome 
+# where TSS or TES reads are likely methodological artifacts:
+#   TSO oligos perform strand invasion at internal sites complementary
+#     to their 3' ends (Tang et al. 2012, Nucleic Acids Research)
+#   oligo(dT) priming results in internal priming artifacts at templated 
+#     A-rich or purine-rich regions of transcripts
+# Customize what sequences are masked by editing the file 
+# /resources/mask_sequences.table
 
 if [ -f $TSS_PLUS ] && [ -f $TSS_MINUS ]
 then
@@ -131,11 +115,21 @@ for strand in plus minus
 do
     if [ $TSS == "true" ]
     then
-        python $python_dir/bedgraph_mask.py -B=$temp_dir/TSS_"$strand".bedgraph -O=$temp_dir/TSS_"$strand"_mask.bedgraph -L=$resource_dir/length.table -S=$strand -U=$resource_dir/TSS_mask_up.bed 
+        python $python_dir/bedgraph_mask.py \
+            -B=$temp_dir/TSS_"$strand".bedgraph \
+            -O=$temp_dir/TSS_"$strand"_mask.bedgraph \
+            -L=$resource_dir/length.table \
+            -S=$strand \
+            -U=$resource_dir/TSS_mask_up.bed 
     fi
     if [ $TES == "true" ]
     then
-        python $python_dir/bedgraph_mask.py -B=$temp_dir/TES_"$strand".bedgraph -O=$temp_dir/TES_"$strand"_mask.bedgraph -L=$resource_dir/length.table -S=$strand -D=$resource_dir/TES_mask_down.bed
+        python $python_dir/bedgraph_mask.py \
+            -B=$temp_dir/TES_"$strand".bedgraph \
+            -O=$temp_dir/TES_"$strand"_mask.bedgraph \
+            -L=$resource_dir/length.table \
+            -S=$strand \
+            -D=$resource_dir/TES_mask_down.bed
     fi
 done
 
@@ -146,125 +140,118 @@ echo "####################################################################"
 echo "### STEP 2: PARAMETER ESTIMATION WITH SUBTRACTIVE BEDGRAPH FILES ###"
 echo "####################################################################"
 echo " "
-# Generates four subtractive bedgraph files based on theoretical read distribution:
+# Performs a meta-analysis of annotated transcripts to determine 2 parameters:
+#     Optimal bandwidth for kernel density estimation
+#     Scaling factor to adjust for capture efficiency of TSS/TES/BODY reads
+#
+# Generates four scaled subtractive bedgraph files:
 #     TSSplus  - BODYminus
 #     TSSminus - BODYplus
 #     TESplus  - BODYplus
 #     TESminus - BODYminus
-# 
-# Performs a meta-analysis on annotated TSS/TES sites to determine 2 parameters:
-#     Optimal bandwidth for kernel density estimation
-#     Scaling factor to adjust for varying capture efficiency of TSS, TES, and BODY reads
-# 
-# Rebuilds subtractive bedgraph files with the appropriate scaling factor
 
-TSS_sf=10000
-TES_sf=10000
-TSS_bandwidth=50
-TES_bandwidth=50
-TSS_optimized="false"
-TES_optimized="false"
-optimal_TSS_run=$ITERATIONS
-optimal_TES_run=$ITERATIONS
+TSS_scale=1
+TES_scale=1
+SCALE_CAP=10
 
 if [ $TSS == "true" ]
 then
-    unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-    awk '{printf $1"\t"$2"\t"$3"\t"$4-$5"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
-    unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-    awk '{printf $1"\t"$2"\t"$3"\t"$4-$5"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
+    python $python_dir/bedgraph_rescale.py \
+        -P TSS_plus_mask.bedgraph \
+        -N "$sample_type"_BODY_minus.bedgraph \
+        -A $annotation_gff \
+        -S + \
+        > TSS_scale_plus.txt
+    
+    python $python_dir/bedgraph_rescale.py \
+        -P TSS_minus_mask.bedgraph \
+        -N "$sample_type"_BODY_plus.bedgraph \
+        -A $annotation_gff \
+        -S - \
+        > TSS_scale_minus.txt
+    
+    TSS_plus_scales=( $(tail -n 1 TSS_scale_plus.txt) )
+    TSS_minus_scales=( $(tail -n 1 TSS_scale_minus.txt) )
+    TSS_scale=$(printf "%.2f" $(echo "(${TSS_plus_scales[0]} + ${TSS_minus_scales[0]}) / 2" | bc -l))
+    TSS_bandwidth=$(printf "%.0f" $(echo "(${TSS_plus_scales[1]} + ${TSS_minus_scales[1]}) / 2" | bc -l))
+    
+    if [[ $TSS_scale > $SCALE_CAP ]]
+    then    
+        TSS_scale=$SCALE_CAP
+        echo "TSS hit cap of $SCALE_CAP"
+    fi
+    
+    unionBedGraphs -i TSS_plus_mask.bedgraph \
+        "$sample_type"_BODY_minus.bedgraph \
+        > tmp.bedgraph
+    
+    awk -v mult=$TSS_scale \
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
+        > TSS_plus_subtract.bedgraph
+    
+    unionBedGraphs -i TSS_minus_mask.bedgraph \
+        "$sample_type"_BODY_plus.bedgraph \
+        > tmp.bedgraph
+    
+    awk -v mult=$TSS_scale \
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
+        > TSS_minus_subtract.bedgraph
 fi
+
 if [ $TES == "true" ]
 then
-    unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-    awk '{printf $1"\t"$2"\t"$3"\t"$4-$5"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
-    unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-    awk '{printf $1"\t"$2"\t"$3"\t"$4-$5"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
+    python $python_dir/bedgraph_rescale.py \
+        -P TES_plus_mask.bedgraph \
+        -N "$sample_type"_BODY_plus.bedgraph \
+        -A $annotation_gff \
+        -S + \
+        > TES_scale_plus.txt
+        
+    python $python_dir/bedgraph_rescale.py \
+        -P TES_minus_mask.bedgraph \
+        -N "$sample_type"_BODY_minus.bedgraph \
+        -A $annotation_gff \
+        -S - \
+        > TES_scale_minus.txt
+    
+    TES_plus_scales=( $(tail -n 1 TES_scale_plus.txt) )
+    TES_minus_scales=( $(tail -n 1 TES_scale_minus.txt) )
+    TES_scale=$(printf "%.2f" $(echo "(${TES_plus_scales[0]} + ${TES_minus_scales[0]}) / 2" | bc -l))
+    TES_bandwidth=$(printf "%.0f" $(echo "(${TES_plus_scales[2]} + ${TES_minus_scales[2]}) / 2" | bc -l))
+    
+    if [[ $TES_scale > $SCALE_CAP ]]
+    then
+        TES_scale=$SCALE_CAP
+        echo "TES hit cap of $SCALE_CAP"
+    fi
+    
+    unionBedGraphs -i TES_plus_mask.bedgraph \
+        "$sample_type"_BODY_plus.bedgraph \
+        > tmp.bedgraph
+
+    awk -v mult=$TES_scale \
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
+        > TES_plus_subtract.bedgraph
+
+    unionBedGraphs -i TES_minus_mask.bedgraph \
+        "$sample_type"_BODY_minus.bedgraph \
+        > tmp.bedgraph
+
+    awk -v mult=$TES_scale \
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
+        > TES_minus_subtract.bedgraph
 fi
 
-if [ $ITERATIONS -ge 1 ]
-then
-    echo "Read scaling optimization:"
-    for ((run=1;run<=$ITERATIONS;run++))
-    do
-        if [ $TSS == "true" ]
-        then
-            if [ $TSS_optimized == "false" ]
-            then
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=$temp_dir/TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > $temp_dir/TSS_start_plus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=$temp_dir/TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > $temp_dir/TSS_start_minus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=$temp_dir/TSS_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > $temp_dir/TSS_end_plus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=$temp_dir/TSS_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > $temp_dir/TSS_end_minus.meta
-            fi
-            paste $temp_dir/TSS_start_plus.meta $temp_dir/TSS_start_minus.meta $temp_dir/TSS_end_plus.meta $temp_dir/TSS_end_minus.meta | awk '{printf "%.8f %.8f\n", ($1+$2)/2, ($3+$4)/2}' > $temp_dir/TSS_metaplot.tab
-            cp $temp_dir/TSS_metaplot.tab $temp_dir/TSS_metaplot_$run.tab
-            Rscript $r_dir/TSS_TES_scaling_factors.R $temp_dir/TSS_metaplot_$run.tab > $temp_dir/TSS_scaling_factors_$run.tab
-            TSS_prev=$TSS_sf
-            if [ $run -le $optimal_TSS_run ]
-            then
-                TSS_sf=$(cut -d ' ' -f 1 $temp_dir/TSS_scaling_factors_$run.tab)
-                TSS_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 $temp_dir/TSS_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
-                TSS_scale=$(echo "1-((1-$TSS_scales)*$APPROACH)" | bc -l)
-                TSS_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TSS_scaling_factors_$run.tab)
-            fi
-            echo "TSS_run_$run $TSS_sf $TSS_scale $TSS_bandwidth"
-            if [ $(echo $(printf "%.3f" $(echo 1-$TSS_sf | bc | tr -d -))" >= "$(printf "%.3f" $(echo 1-$TSS_prev | bc | tr -d -)) | bc) -eq 1 ]
-            then
-                TSS_optimized="true"
-                optimal_TSS_run=$run
-            else
-                unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-                awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_plus_subtract.bedgraph
-                unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-                awk -v mult=$TSS_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TSS_minus_subtract.bedgraph
-            fi
-        fi
-        if [ $TES == "true" ]
-        then
-            if [ $TES_optimized == "false" ]
-            then
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=$temp_dir/TES_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > $temp_dir/TES_start_plus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TSS_sites.gff -B=$temp_dir/TES_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > $temp_dir/TES_start_minus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=$temp_dir/TES_plus_subtract.bedgraph -S=plus -L=$resource_dir/length.table > $temp_dir/TES_end_plus.meta
-                python $python_dir/bedgraph_metaplot.py -G=$resource_dir/TES_sites.gff -B=$temp_dir/TES_minus_subtract.bedgraph -S=minus -L=$resource_dir/length.table > $temp_dir/TES_end_minus.meta
-            fi
-            paste $temp_dir/TES_start_plus.meta $temp_dir/TES_start_minus.meta $temp_dir/TES_end_plus.meta $temp_dir/TES_end_minus.meta | awk '{printf "%.8f %.8f\n", ($1+$2)/2, ($3+$4)/2}' > $temp_dir/TES_metaplot.tab
-            cp $temp_dir/TES_metaplot.tab $temp_dir/TES_metaplot_$run.tab
-            Rscript $r_dir/TSS_TES_scaling_factors.R $temp_dir/TES_metaplot_$run.tab > $temp_dir/TES_scaling_factors_$run.tab
-            TES_prev=$TES_sf
-            if [ $run -le $optimal_TES_run ]
-            then
-                TES_sf=$(cut -d ' ' -f 1 $temp_dir/TES_scaling_factors_$run.tab)
-                TES_scales=$(echo -n $(for ((i=1;i<=$run;i++)); do echo $(cut -d ' ' -f 1 $temp_dir/TES_scaling_factors_$i.tab); done | tr '\n' ' ') | tr ' ' '*')
-                TES_scale=$(echo "1-((1-$TES_scales)*$APPROACH)" | bc -l)
-                TES_bandwidth=$(cut -d ' ' -f 2 $temp_dir/TES_scaling_factors_$run.tab)
-            fi
-            echo "TES_run_$run $TES_scale $TES_bandwidth"
-            if [ $(echo $(printf "%.3f" $(echo 1-$TES_sf | bc | tr -d -))" >= "$(printf "%.3f" $(echo 1-$TES_prev | bc | tr -d -)) | bc) -eq 1 ]
-            then
-                TES_optimized="true"
-                optimal_TES_run=$run
-            else
-                unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph $temp_dir/BODY_minus.bedgraph > $temp_dir/tmp.bedgraph
-                awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_plus_subtract.bedgraph
-                unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph $temp_dir/BODY_plus.bedgraph > $temp_dir/tmp.bedgraph
-                awk -v mult=$TES_scale '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5/mult"\n"}' $temp_dir/tmp.bedgraph > $temp_dir/TES_minus_subtract.bedgraph
-            fi
-        fi
-    done
-fi
 echo "$TSS_scale $TES_scale" > final_scaling_factors.tab
-
 rm $temp_dir/tmp.bedgraph
-rm $temp_dir/TSS_start_plus.meta $temp_dir/TSS_start_minus.meta $temp_dir/TSS_end_plus.meta $temp_dir/TSS_end_minus.meta
-rm $temp_dir/TES_start_plus.meta $temp_dir/TES_start_minus.meta $temp_dir/TES_end_plus.meta $temp_dir/TES_end_minus.meta
 
 ### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
 echo "#########################################################"
 echo "### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###"
 echo "#########################################################"
 echo " "
-# Takes the four subtractive BEDGRAPH files generated in PHASE 3.3 and smooths them using a continous kernel function.
+# Takes the four subtractive BEDGRAPH files generated in PHASE 3 
+# and smooths them using a continous kernel function.
 # See the Python util "bedgraph_kernel_density.py" for full details.
 # Defaults to a summed Laplace distribution smoothing
 
@@ -283,12 +270,8 @@ do
     if [ $readtype == 'TSS' ]
     then
         bandwidth=$TSS_bandwidth
-        # sf=$TSS_scale
-        sf=$(echo $TSS_scale"*"$APPROACH | bc -l)
     else
         bandwidth=$TES_bandwidth
-        # sf=$TES_scale
-        sf=$(echo $TES_scale"*"$APPROACH | bc -l)
     fi
     for strand in plus minus
     do
@@ -312,14 +295,13 @@ do
         fi
         feature_threshold_command="python \
         $python_dir/bedgraph_thresh_to_bed.py \
-        -B=$temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
-        -O=$temp_dir/"$readtype"_"$strand"_features.bed \
-        -L=$resource_dir/length.table \
-        -T=0 \
-        -M=10 \
-        -V=sum \
-        -MV=$sf \
-        -S=$strand"
+        -B "$readtype"_"$strand"_smooth.bedgraph \
+        -O "$readtype"_"$strand"_features.bed \
+        -L $resource_dir/length.table \
+        -T 0 \
+        -M 10 \
+        -V sum \
+        -S $strand"
         echo $feature_threshold_command
         eval $feature_threshold_command
         if [ ! -f $temp_dir/"$readtype"_"$strand"_features.bed ]
@@ -334,19 +316,31 @@ done
 touch $temp_dir/end_features_temp.bed
 if [ $TSS == "true" ]
 then
-    sed 's/thresh./TSS.plus./' $temp_dir/TSS_plus_features.bed >> $temp_dir/end_features_temp.bed
-    sed 's/thresh./TSS.minus./' $temp_dir/TSS_minus_features.bed >> $temp_dir/end_features_temp.bed
-    Rscript $r_dir/TSS_TES_metaplot.R $temp_dir/TSS_metaplot.tab
+    sed 's/thresh./TSS.plus./' $temp_dir/TSS_plus_features.bed \
+        >> $temp_dir/end_features_temp.bed
+    sed 's/thresh./TSS.minus./' $temp_dir/TSS_minus_features.bed \
+        >> $temp_dir/end_features_temp.bed
 fi
 if [ $TES == "true" ]
 then
-    sed 's/thresh./TES.plus./' $temp_dir/TES_plus_features.bed >> $temp_dir/end_features_temp.bed
-    sed 's/thresh./TES.minus./' $temp_dir/TES_minus_features.bed >> $temp_dir/end_features_temp.bed
-    Rscript $r_dir/TSS_TES_metaplot.R $temp_dir/TES_metaplot.tab
+    sed 's/thresh./TES.plus./' $temp_dir/TES_plus_features.bed \
+        >> $temp_dir/end_features_temp.bed
+    sed 's/thresh./TES.minus./' $temp_dir/TES_minus_features.bed \
+        >> $temp_dir/end_features_temp.bed
 fi
 bedtools sort -i $temp_dir/end_features_temp.bed > $temp_dir/end_features.bed
-rm $temp_dir/end_features_temp.bed $temp_dir/TSS_plus_features.bed $temp_dir/TSS_minus_features.bed $temp_dir/TES_plus_features.bed $temp_dir/TES_minus_features.bed
-# rm $temp_dir/TSS_plus_subtract.bedgraph $temp_dir/TSS_minus_subtract.bedgraph $temp_dir/TES_plus_subtract.bedgraph $temp_dir/TSS_minus_subtract.bedgraph
+
+rm $temp_dir/end_features_temp.bed \
+    $temp_dir/TSS_plus_features.bed \
+    $temp_dir/TSS_minus_features.bed \
+    $temp_dir/TES_plus_features.bed \
+    $temp_dir/TES_minus_features.bed
+
+rm $temp_dir/TSS_plus_subtract.bedgraph \
+    $temp_dir/TSS_minus_subtract.bedgraph \
+    $temp_dir/TES_plus_subtract.bedgraph \
+    $temp_dir/TSS_minus_subtract.bedgraph
+
 for readtype in ${readtypes[@]}
 do
     for strand in plus minus

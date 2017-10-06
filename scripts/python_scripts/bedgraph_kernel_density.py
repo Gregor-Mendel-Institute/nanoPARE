@@ -22,7 +22,7 @@ This can be used to mask sequence-specific artifacts, like TSO strand invasion o
 
 KERNEL    = 'laplace'
 BANDWIDTH = 50
-SIGMA     = 5
+SIGMA     = 3
 DIGITS    = 3
 ONLY_POSITIVE = False
 
