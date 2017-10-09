@@ -175,7 +175,7 @@ echo " "
 TSS_scale=1
 TES_scale=1
 SCALE_CAP=10
-BANDWIDTH_CAP=20
+BANDWIDTH_CAP=40
 
 if [ $TSS == "true" ]
 then

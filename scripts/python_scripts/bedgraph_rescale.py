@@ -197,18 +197,18 @@ for ID in ref_IDs:
     if max_pos == 0 or max_neg == 0:
         continue
     
-    nonzero_pos = [i for i in pos if i]
-    nonzero_neg = [i for i in neg if i]
-    mean_pos = sum(nonzero_pos)/len(nonzero_pos)
-    mean_neg = sum(nonzero_neg)/len(nonzero_neg)
+    # nonzero_pos = [i for i in pos if i]
+    # nonzero_neg = [i for i in neg if i]
+    # mean_pos = sum(nonzero_pos)/len(nonzero_pos)
+    # mean_neg = sum(nonzero_neg)/len(nonzero_neg)
     
     start_meta_pos = [a + (float(b)/max_both) for a,b in zip(start_meta_pos, pos[:metalength])]
     start_meta_neg = [a + (float(b)/max_both) for a,b in zip(start_meta_neg, neg[:metalength])]
     end_meta_pos = [a + (float(b)/max_both) for a,b in zip(end_meta_pos, pos[-metalength:])]
     end_meta_neg = [a + (float(b)/max_both) for a,b in zip(end_meta_neg, neg[-metalength:])]
     
-    # ratio += float(max_neg)/max_pos
-    mratio += float(mean_neg)/mean_pos
+    ratio += float(max_neg)/max_pos
+    #mratio += float(mean_neg)/mean_pos
     ID_count += 1
 
 print('# {} {} stranded transcripts with positive signal'.format(
@@ -216,7 +216,7 @@ print('# {} {} stranded transcripts with positive signal'.format(
     args.strand
 ))
 
-scaling_factor = mratio/ID_count
+scaling_factor = ratio/ID_count
 
 start_meta = [(a*scaling_factor - b)/ID_count for a,b in zip(start_meta_pos, start_meta_neg)]
 end_meta = [(a*scaling_factor - b)/ID_count for a,b in zip(end_meta_pos, end_meta_neg)]
