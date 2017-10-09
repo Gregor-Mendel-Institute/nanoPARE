@@ -22,6 +22,8 @@ TES_PLUS=$resource_dir/TES_plus.bedgraph
 TES_MINUS=$resource_dir/TES_minus.bedgraph
 BODY_PLUS=$resource_dir/BODY_plus.bedgraph
 BODY_MINUS=$resource_dir/BODY_minus.bedgraph
+UUG_PLUS=
+UUG_MINUS=
 
 SAMPLE_NAME="sample"
 LMOD=0
@@ -71,7 +73,6 @@ then
     echo "Setup complete."
     exit 0
 fi
-
 
 ### STEP 1: BEDGRAPH ARTIFACT MASKING ###
 echo "#########################################"
@@ -133,6 +134,27 @@ do
     fi
 done
 
+if [ -z $UUG_PLUS ]
+then
+    echo "uuG files not provided. Skipping uuG masking."
+else
+    echo "uuG files: $UUG_PLUS $UUG_MINUS"
+    python $python_dir/bedgraph_mask.py \
+        -B=$UUG_PLUS \
+        -O=$temp_dir/uuG_plus_mask.bedgraph \
+        -L=$resource_dir/length.table \
+        -S=plus \
+        -D=$resource_dir/TSS_mask_up.bed
+
+    python $python_dir/bedgraph_mask.py \
+        -B=$UUG_MINUS \
+        -O=$temp_dir/uuG_minus_mask.bedgraph \
+        -L=$resource_dir/length.table \
+        -S=minus \
+        -D=$resource_dir/TSS_mask_up.bed
+fi
+
+
 echo "Step 1 complete."
 
 ### STEP 2: PARAMETER ESTIMATION WITH SUBTRACTIVE BEDGRAPH FILES ###
@@ -150,7 +172,6 @@ echo " "
 #     TESplus  - BODYplus
 #     TESminus - BODYminus
 
-cd $temp_dir
 TSS_scale=1
 TES_scale=1
 SCALE_CAP=10
@@ -159,21 +180,21 @@ BANDWIDTH_CAP=20
 if [ $TSS == "true" ]
 then
     python $python_dir/bedgraph_rescale.py \
-        -P TSS_plus_mask.bedgraph \
-        -N BODY_minus.bedgraph \
+        -P $temp_dir/TSS_plus_mask.bedgraph \
+        -N $temp_dir/BODY_minus.bedgraph \
         -A $annotation_gff \
         -S + \
-        > TSS_scale_plus.txt
+        > $temp_dir/TSS_scale_plus.txt
     
     python $python_dir/bedgraph_rescale.py \
-        -P TSS_minus_mask.bedgraph \
-        -N BODY_plus.bedgraph \
+        -P $temp_dir/TSS_minus_mask.bedgraph \
+        -N $temp_dir/BODY_plus.bedgraph \
         -A $annotation_gff \
         -S - \
-        > TSS_scale_minus.txt
+        > $temp_dir/TSS_scale_minus.txt
     
-    TSS_plus_scales=( $(tail -n 1 TSS_scale_plus.txt) )
-    TSS_minus_scales=( $(tail -n 1 TSS_scale_minus.txt) )
+    TSS_plus_scales=( $(tail -n 1 $temp_dir/TSS_scale_plus.txt) )
+    TSS_minus_scales=( $(tail -n 1 $temp_dir/TSS_scale_minus.txt) )
     TSS_scale=$(printf "%.2f" $(echo "(${TSS_plus_scales[0]} + ${TSS_minus_scales[0]}) / 2" | bc -l))
     TSS_bandwidth=$(printf "%.0f" $(echo "(${TSS_plus_scales[1]} + ${TSS_minus_scales[1]}) / 2" | bc -l))
     
@@ -190,41 +211,41 @@ then
     fi
 
     
-    unionBedGraphs -i TSS_plus_mask.bedgraph \
-        BODY_minus.bedgraph \
-        > tmp.bedgraph
+    unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph \
+        $temp_dir/BODY_minus.bedgraph \
+        > $temp_dir/tmp.bedgraph
     
     awk -v mult=$TSS_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
-        > TSS_plus_subtract.bedgraph
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+        > $temp_dir/TSS_plus_subtract.bedgraph
     
-    unionBedGraphs -i TSS_minus_mask.bedgraph \
-        BODY_plus.bedgraph \
-        > tmp.bedgraph
+    unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph \
+        $temp_dir/BODY_plus.bedgraph \
+        > $temp_dir/tmp.bedgraph
     
     awk -v mult=$TSS_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
-        > TSS_minus_subtract.bedgraph
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+        > $temp_dir/TSS_minus_subtract.bedgraph
 fi
 
 if [ $TES == "true" ]
 then
     python $python_dir/bedgraph_rescale.py \
-        -P TES_plus_mask.bedgraph \
-        -N BODY_plus.bedgraph \
+        -P $temp_dir/TES_plus_mask.bedgraph \
+        -N $temp_dir/BODY_plus.bedgraph \
         -A $annotation_gff \
         -S + \
-        > TES_scale_plus.txt
+        > $temp_dir/TES_scale_plus.txt
         
     python $python_dir/bedgraph_rescale.py \
-        -P TES_minus_mask.bedgraph \
-        -N BODY_minus.bedgraph \
+        -P $temp_dir/TES_minus_mask.bedgraph \
+        -N $temp_dir/BODY_minus.bedgraph \
         -A $annotation_gff \
         -S - \
-        > TES_scale_minus.txt
+        > $temp_dir/TES_scale_minus.txt
     
-    TES_plus_scales=( $(tail -n 1 TES_scale_plus.txt) )
-    TES_minus_scales=( $(tail -n 1 TES_scale_minus.txt) )
+    TES_plus_scales=( $(tail -n 1 $temp_dir/TES_scale_plus.txt) )
+    TES_minus_scales=( $(tail -n 1 $temp_dir/TES_scale_minus.txt) )
     TES_scale=$(printf "%.2f" $(echo "(${TES_plus_scales[0]} + ${TES_minus_scales[0]}) / 2" | bc -l))
     TES_bandwidth=$(printf "%.0f" $(echo "(${TES_plus_scales[2]} + ${TES_minus_scales[2]}) / 2" | bc -l))
     
@@ -240,24 +261,24 @@ then
         echo "TES hit bandwidth cap of $BANDWIDTH_CAP"
     fi
 
-    unionBedGraphs -i TES_plus_mask.bedgraph \
-        BODY_plus.bedgraph \
-        > tmp.bedgraph
+    unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph \
+        $temp_dir/BODY_plus.bedgraph \
+        > $temp_dir/tmp.bedgraph
 
     awk -v mult=$TES_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
-        > TES_plus_subtract.bedgraph
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+        > $temp_dir/TES_plus_subtract.bedgraph
 
-    unionBedGraphs -i TES_minus_mask.bedgraph \
-        BODY_minus.bedgraph \
-        > tmp.bedgraph
+    unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph \
+        $temp_dir/BODY_minus.bedgraph \
+        > $temp_dir/tmp.bedgraph
 
     awk -v mult=$TES_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' tmp.bedgraph \
-        > TES_minus_subtract.bedgraph
+        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+        > $temp_dir/TES_minus_subtract.bedgraph
 fi
 
-echo "$TSS_scale $TES_scale" > final_scaling_factors.tab
+echo "$TSS_scale $TES_scale" > $temp_dir/final_scaling_factors.tab
 rm $temp_dir/tmp.bedgraph
 
 ### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
@@ -310,8 +331,8 @@ do
         fi
         feature_threshold_command="python \
         $python_dir/bedgraph_thresh_to_bed.py \
-        -B "$readtype"_"$strand"_smooth.bedgraph \
-        -O "$readtype"_"$strand"_features.bed \
+        -B $temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
+        -O $temp_dir/"$readtype"_"$strand"_features.bed \
         -L $resource_dir/length.table \
         -T 0 \
         -M 10 \
@@ -365,6 +386,29 @@ do
 done
 
 echo "Phase 3.4 complete."
+
+### PHASE 3.5: CAP PREDICTION ###
+echo "#################################"
+echo "### PHASE 3.5: CAP PREDICTION ###"
+echo "#################################"
+echo " "
+if [ -z $UUG_PLUS ]
+then
+    echo "uuG files not provided. Skipping cap prediction."
+else
+    echo "uuG files: $UUG_PLUS $UUG_MINUS"
+    python $python_dir/bed_uug_filter.py \
+        -C $temp_dir/capped_features.bed \
+        -U $temp_dir/uncapped_features.bed \
+        $temp_dir/end_features.bed \
+        $temp_dir/TSS_plus_mask.bedgraph \
+        $temp_dir/TSS_minus_mask.bedgraph \
+        $temp_dir/uuG_plus_mask.bedgraph \
+        $temp_dir/uuG_minus_mask.bedgraph \
+        $genome_fasta
+fi
+
+
 echo "PHASE 3 complete!"
 
 

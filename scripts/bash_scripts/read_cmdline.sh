@@ -19,6 +19,7 @@ Arguments:
 -N | --name          Sample name (string, default = "sample")
 -5 | --tss | --5p    Paths to two BEDGRAPH files of 5' end reads on both strands of the reference genome
 -3 | --tes | --3p    Paths to two BEDGRAPH files of 3' end reads on both strands of the reference genome
+-U | --uug           Paths to two BEDGRAPH files of 5' end reads with untemplated upstream G's (uuG's)
 -B | --body | --neg  Path(s) to BEDGRAPH file(s) of locations of gene body reads (on both strands) of the reference genome
 -G | --genome        FASTA file of the reference genome
 -A | --annotation    GFF file of gene annotations
@@ -62,7 +63,9 @@ while [ "$1" != "" ]; do
                                 ;;
     -5 | --tss | --5p )         shift; TSS_PLUS=$1; shift; TSS_MINUS=$1 
                                 ;;
-    -3 | --tes | --3p )         shift; TES_PLUS=$1; shift; TES_MINUS=$1 
+    -3 | --tes | --3p )         shift; TES_PLUS=$1; shift; TES_MINUS=$1
+                                ;;
+    -U | --uug )                shift; UUG_PLUS=$1; shift; UUG_MINUS=$1
                                 ;;
     -G | --genome )             shift; genome_fasta=$1
                                 ;;
