@@ -150,22 +150,24 @@ echo " "
 #     TESplus  - BODYplus
 #     TESminus - BODYminus
 
+cd $temp_dir
 TSS_scale=1
 TES_scale=1
 SCALE_CAP=10
+BANDWIDTH_CAP=20
 
 if [ $TSS == "true" ]
 then
     python $python_dir/bedgraph_rescale.py \
         -P TSS_plus_mask.bedgraph \
-        -N "$sample_type"_BODY_minus.bedgraph \
+        -N BODY_minus.bedgraph \
         -A $annotation_gff \
         -S + \
         > TSS_scale_plus.txt
     
     python $python_dir/bedgraph_rescale.py \
         -P TSS_minus_mask.bedgraph \
-        -N "$sample_type"_BODY_plus.bedgraph \
+        -N BODY_plus.bedgraph \
         -A $annotation_gff \
         -S - \
         > TSS_scale_minus.txt
@@ -178,11 +180,18 @@ then
     if [[ $TSS_scale > $SCALE_CAP ]]
     then    
         TSS_scale=$SCALE_CAP
-        echo "TSS hit cap of $SCALE_CAP"
+        echo "TSS hit scale cap of $SCALE_CAP"
     fi
+
+    if [[ $TSS_bandwidth > $BANDWIDTH_CAP ]]
+    then
+        TSS_bandwidth=$BANDWIDTH_CAP
+        echo "TSS hit bandwidth cap of $BANDWIDTH_CAP"
+    fi
+
     
     unionBedGraphs -i TSS_plus_mask.bedgraph \
-        "$sample_type"_BODY_minus.bedgraph \
+        BODY_minus.bedgraph \
         > tmp.bedgraph
     
     awk -v mult=$TSS_scale \
@@ -190,7 +199,7 @@ then
         > TSS_plus_subtract.bedgraph
     
     unionBedGraphs -i TSS_minus_mask.bedgraph \
-        "$sample_type"_BODY_plus.bedgraph \
+        BODY_plus.bedgraph \
         > tmp.bedgraph
     
     awk -v mult=$TSS_scale \
@@ -202,14 +211,14 @@ if [ $TES == "true" ]
 then
     python $python_dir/bedgraph_rescale.py \
         -P TES_plus_mask.bedgraph \
-        -N "$sample_type"_BODY_plus.bedgraph \
+        -N BODY_plus.bedgraph \
         -A $annotation_gff \
         -S + \
         > TES_scale_plus.txt
         
     python $python_dir/bedgraph_rescale.py \
         -P TES_minus_mask.bedgraph \
-        -N "$sample_type"_BODY_minus.bedgraph \
+        -N BODY_minus.bedgraph \
         -A $annotation_gff \
         -S - \
         > TES_scale_minus.txt
@@ -222,11 +231,17 @@ then
     if [[ $TES_scale > $SCALE_CAP ]]
     then
         TES_scale=$SCALE_CAP
-        echo "TES hit cap of $SCALE_CAP"
+        echo "TES hit scale cap of $SCALE_CAP"
     fi
     
+    if [[ $TES_bandwidth > $BANDWIDTH_CAP ]]
+    then
+        TES_bandwidth=$BANDWIDTH_CAP
+        echo "TES hit bandwidth cap of $BANDWIDTH_CAP"
+    fi
+
     unionBedGraphs -i TES_plus_mask.bedgraph \
-        "$sample_type"_BODY_plus.bedgraph \
+        BODY_plus.bedgraph \
         > tmp.bedgraph
 
     awk -v mult=$TES_scale \
@@ -234,7 +249,7 @@ then
         > TES_plus_subtract.bedgraph
 
     unionBedGraphs -i TES_minus_mask.bedgraph \
-        "$sample_type"_BODY_minus.bedgraph \
+        BODY_minus.bedgraph \
         > tmp.bedgraph
 
     awk -v mult=$TES_scale \
@@ -282,7 +297,7 @@ do
         -L=$resource_dir/length.table \
         -K=$KERNEL \
         -H=$bandwidth \
-        -S=5 \
+        -S=3 \
         -D=3 \
         -MV=$sf \
         -P=True"
