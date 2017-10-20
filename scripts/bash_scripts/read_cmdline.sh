@@ -59,6 +59,8 @@ while [ "$1" != "" ]; do
                                 ;;
     --approach )                shift; APPROACH=$1
                                 ;;
+    --cpus )                    shift; CPUS=$1
+                                ;;
     -N | --name )               shift; SAMPLE_NAME=$1;
                                 ;;
     -5 | --tss | --5p )         shift; TSS_PLUS=$1; shift; TSS_MINUS=$1 

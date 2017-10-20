@@ -27,6 +27,7 @@ UUG_MINUS=
 
 SAMPLE_NAME="sample"
 LMOD=0
+CPUS=1
 SETUP=false
 KERNEL='laplace'
 
@@ -112,27 +113,26 @@ else
     cp $BODY_PLUS $temp_dir/BODY_minus.bedgraph
 fi
 
-for strand in plus minus
-do
-    if [ $TSS == "true" ]
-    then
-        python $python_dir/bedgraph_mask.py \
-            -B=$temp_dir/TSS_"$strand".bedgraph \
-            -O=$temp_dir/TSS_"$strand"_mask.bedgraph \
-            -L=$resource_dir/length.table \
-            -S=$strand \
-            -U=$resource_dir/TSS_mask_up.bed 
-    fi
-    if [ $TES == "true" ]
-    then
-        python $python_dir/bedgraph_mask.py \
-            -B=$temp_dir/TES_"$strand".bedgraph \
-            -O=$temp_dir/TES_"$strand"_mask.bedgraph \
-            -L=$resource_dir/length.table \
-            -S=$strand \
-            -D=$resource_dir/TES_mask_down.bed
-    fi
-done
+if [ $TSS == "true" ]
+then
+    python $python_dir/bedgraph_mask.py \
+        -P $temp_dir/TSS_plus.bedgraph \
+        -M $temp_dir/TSS_minus.bedgraph \
+        -PO $temp_dir/TSS_plus_mask.bedgraph \
+        -MO $temp_dir/TSS_minus_mask.bedgraph \
+        -U=$resource_dir/TSS_mask_up.bed \
+        $resource_dir/length.table
+fi
+if [ $TES == "true" ]
+then
+    python $python_dir/bedgraph_mask.py \
+        -P $temp_dir/TES_plus.bedgraph \
+        -M $temp_dir/TES_minus.bedgraph \
+        -PO $temp_dir/TES_plus_mask.bedgraph \
+        -MO $temp_dir/TES_minus_mask.bedgraph \
+        -D $resource_dir/TES_mask_down.bed \
+        $resource_dir/length.table
+fi
 
 if [ -z $UUG_PLUS ]
 then
@@ -140,18 +140,12 @@ then
 else
     echo "uuG files: $UUG_PLUS $UUG_MINUS"
     python $python_dir/bedgraph_mask.py \
-        -B=$UUG_PLUS \
-        -O=$temp_dir/uuG_plus_mask.bedgraph \
-        -L=$resource_dir/length.table \
-        -S=plus \
-        -D=$resource_dir/TSS_mask_up.bed
-
-    python $python_dir/bedgraph_mask.py \
-        -B=$UUG_MINUS \
-        -O=$temp_dir/uuG_minus_mask.bedgraph \
-        -L=$resource_dir/length.table \
-        -S=minus \
-        -D=$resource_dir/TSS_mask_up.bed
+        -P $UUG_PLUS \
+        -M $UUG_MINUS \
+        -PO $temp_dir/uuG_plus_mask.bedgraph \
+        -MO $temp_dir/uuG_minus_mask.bedgraph \
+        -U=$resource_dir/TSS_mask_up.bed \
+        $resource_dir/length.table
 fi
 
 
@@ -175,7 +169,7 @@ echo " "
 TSS_scale=1
 TES_scale=1
 SCALE_CAP=10
-BANDWIDTH_CAP=40
+BANDWIDTH_CAP=30
 
 if [ $TSS == "true" ]
 then
@@ -184,6 +178,7 @@ then
         -N $temp_dir/BODY_minus.bedgraph \
         -A $annotation_gff \
         -S + \
+        --align \
         > $temp_dir/TSS_scale_plus.txt
     
     python $python_dir/bedgraph_rescale.py \
@@ -191,6 +186,7 @@ then
         -N $temp_dir/BODY_plus.bedgraph \
         -A $annotation_gff \
         -S - \
+        --align \
         > $temp_dir/TSS_scale_minus.txt
     
     TSS_plus_scales=( $(tail -n 1 $temp_dir/TSS_scale_plus.txt) )
@@ -313,15 +309,13 @@ do
     do
         kernel_density_command="python \
         $python_dir/bedgraph_kernel_density.py \
-        -B=$temp_dir/"$readtype"_"$strand"_subtract.bedgraph \
-        -O=$temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
-        -L=$resource_dir/length.table \
-        -K=$KERNEL \
-        -H=$bandwidth \
-        -S=3 \
-        -D=3 \
-        -MV=$sf \
-        -P=True"
+        -B $temp_dir/"$readtype"_"$strand"_subtract.bedgraph \
+        -O $temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
+        -L $resource_dir/length.table \
+        -K $KERNEL \
+        -H $bandwidth \
+        --cores $CPUS
+        -P"
         echo $kernel_density_command
         eval $kernel_density_command
         if [ ! -f $temp_dir/"$readtype"_"$strand"_smooth.bedgraph ]

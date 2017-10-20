@@ -37,6 +37,11 @@ parser.add_argument(
     '--maxband', dest='maxband', type=int, 
     help='maximum bandwidth', default=50
 )
+parser.add_argument(
+    '--align', dest='align',
+    help='Align highest points when calculating metaplot',
+    action='store_true'
+)
 
 
 args = parser.parse_args()
@@ -202,10 +207,85 @@ for ID in ref_IDs:
     # mean_pos = sum(nonzero_pos)/len(nonzero_pos)
     # mean_neg = sum(nonzero_neg)/len(nonzero_neg)
     
-    start_meta_pos = [a + (float(b)/max_both) for a,b in zip(start_meta_pos, pos[:metalength])]
-    start_meta_neg = [a + (float(b)/max_both) for a,b in zip(start_meta_neg, neg[:metalength])]
-    end_meta_pos = [a + (float(b)/max_both) for a,b in zip(end_meta_pos, pos[-metalength:])]
-    end_meta_neg = [a + (float(b)/max_both) for a,b in zip(end_meta_neg, neg[-metalength:])]
+    if args.align:
+        # Offsets the center of the region to add to
+        # the metaplot by its local maximum, resulting
+        # in a sharper peak that reflects the signal spread
+        # at each site rather than at sites generally
+        start_window = pos[:metalength]
+        if max(start_window) == 0:
+            start_offset = 0
+        else:
+            start_offset = min(
+                which(
+                    start_window, 
+                    max(start_window)
+                )
+            ) - args.flanking
+        # Apply offset, adding zeros to pad
+        # missing data when necessary
+        if start_offset == 0:
+            s_p_to_add = pos[:metalength]
+            s_n_to_add = neg[:metalength]
+        elif start_offset > 0:
+            s_p_to_add = pos[start_offset:(metalength + start_offset)]
+            s_n_to_add = neg[start_offset:(metalength + start_offset)]
+            if len(s_p_to_add) < metalength:
+                s_p_to_add += [0]*(metalength - len(s_p_to_add))
+                s_n_to_add += [0]*(metalength - len(s_n_to_add))
+        else:
+            s_p_to_add = [0]*abs(start_offset) + pos[:(metalength + start_offset)]
+            s_n_to_add = [0]*abs(start_offset) + neg[:(metalength + start_offset)]
+            
+        
+        end_window = pos[-metalength:]
+        if max(end_window) == 0:
+            end_offset = 0
+        else:
+            end_offset = max(
+                which(
+                    end_window,
+                    max(end_window)
+                )
+            ) - args.flanking
+        # Apply offset, adding zeros to pad
+        # missing data when necessary
+        if end_offset == 0:
+            e_p_to_add = pos[-metalength:]
+            e_n_to_add = neg[-metalength:]
+        elif end_offset > 0:
+            e_p_to_add = pos[(end_offset - metalength):] + [0]*end_offset
+            e_n_to_add = neg[(end_offset - metalength):] + [0]*end_offset
+        else:
+            e_p_to_add = pos[(end_offset - metalength):end_offset]
+            e_n_to_add = neg[(end_offset - metalength):end_offset]
+            if len(e_p_to_add) < metalength:
+                e_p_to_add += [0]*(metalength - len(e_p_to_add))
+                e_n_to_add += [0]*(metalength - len(e_n_to_add))
+        
+    else:
+        s_p_to_add = pos[:metalength]
+        s_n_to_add = neg[:metalength]
+        e_p_to_add = pos[-metalength:]
+        e_n_to_add = neg[-metalength:]
+    
+    # Add values from the current feature to the metaplots
+    start_meta_pos = [
+        a + (float(b)/max_both)
+        for a,b in zip(start_meta_pos, s_p_to_add)
+    ]
+    start_meta_neg = [
+        a + (float(b)/max_both)
+        for a,b in zip(start_meta_neg, s_n_to_add)
+    ]
+    end_meta_pos = [
+        a + (float(b)/max_both)
+        for a,b in zip(end_meta_pos, e_p_to_add)
+    ]
+    end_meta_neg = [
+        a + (float(b)/max_both)
+        for a,b in zip(end_meta_neg, e_n_to_add)
+    ]
     
     ratio += float(max_neg)/max_pos
     #mratio += float(mean_neg)/mean_pos

@@ -1,62 +1,65 @@
-import sys,os,re,math
+import sys
+import os
+import re
+import math
+import argparse
 from collections import Counter
 
-usage="\
-Takes a BEDGRAPH, as well as BED file(s) with upstream/downstream regions to set to zero; outputs masked BEDGRAPH.\
-\n\
-Commandline arguments:\n\
-    -B=[input bedgraph]           (required filepath)\n\
-    -O=[output bedgraph]          (required filepath)\n\
-    -L=[lengths table]            (required filepath; output from fasta_lengths.py)\n\
-    -S=[strand]                   (default: both; options: both|. , plus|+ , minus|-)\n\
-    -U=[upstream BED mask]        (filepath)\n\
-    -D=[downstream BED mask]      (filepath)\n\
-    -I=[inside BED mask]          (filepath)\n\
-\n\
-Any values immediately upstream of -U or downstream of -D will be set to zero.\n\
-This can be used to mask sequence-specific artifacts, like TSO strand invasion or oligo-dT mispriming.\
-"
+desc = (
+    "Takes a BEDGRAPH, as well as BED file(s) with upstream/downstream regions"
+    "to set to zero; outputs masked BEDGRAPH."
+    "Any values immediately upstream of -U or downstream of -D will be set to zero."
+    "This can be used to mask sequence-specific artifacts, like TSO strand invasion or oligo-dT mispriming."
+    "Any values inside features of the -I bed file will be set to zero."
+)
+parser = argparse.ArgumentParser(description=desc)
 
-BED_UP   = 'none'
-BED_DOWN = 'none'
-BED_IN   = 'none'
-STRAND   = 'both'
+# add arguments to the ArgumentParser
+parser.add_argument(
+    'lengths', type=str, 
+    help='filepath to chromosome lengths table'
+)
+parser.add_argument(
+    '-P', '--plus', dest='PLUS_BG', type=str, 
+    help='input plus strand bedgraph filepath',
+    default=None
+)
+parser.add_argument(
+    '-M', '--minus', dest='MINUS_BG', type=str, 
+    help='input minus strand bedgraph filepath',
+    default=None
+)
+parser.add_argument(
+    '-PO', '--plus_out', dest='PLUS_OUT', type=str, 
+    help='output plus strand bedgraph filepath',
+    default=None
+)
+parser.add_argument(
+    '-MO', '--minus_out', dest='MINUS_OUT', type=str, 
+    help='output minus strand bedgraph filepath',
+    default=None
+)
+parser.add_argument(
+    '-U', '--upstream', dest='BED_UP', type=str, 
+    help='Bed file of features to mask upstream of',
+    default=None
+)
+parser.add_argument(
+    '-D', '--downstream', dest='BED_DOWN', type=str, 
+    help='Bed file of features to mask downstream of',
+    default=None
+)
+parser.add_argument(
+    '-I', '--inside', dest='BED_INSIDE', type=str, 
+    help='Bed file of features to mask inside of',
+    default=None
+)
 
-if len(sys.argv) < 3:
-    print(usage)
-    sys.exit()
-args = sys.argv[1:]
-for arg in args:
-    if len(arg.split('=')) == 1:
-        print("Please connect arguments and values with '='")
-        print(usage)
-        sys.exit()
-    option,value=arg.split('=')
-    if option == '-B':   BEDGRAPH_IN  = value
-    elif option == '-O': BEDGRAPH_OUT = value
-    elif option == '-L': LENGTHS      = value
-    elif option == '-S': STRAND       = value
-    elif option == '-U': BED_UP       = value
-    elif option == '-I': BED_IN       = value
-    elif option == '-D': BED_DOWN     = value
-if 'BEDGRAPH_IN' not in globals():
-    print("ERROR: missing required argument -B=[input bedgraph]")
-    print(usage)
-    sys.exit()
-if 'BEDGRAPH_OUT' not in globals():
-    print("ERROR: missing required argument -O=[output bedgraph]")
-    print(usage)
-    sys.exit()
-if 'LENGTHS' not in globals():
-    print("ERROR: missing required argument -L=[lengths table]")
-    print(usage)
-    sys.exit()
-if STRAND.lower() in ['+','plus','p']:
-    STRAND='+'
-elif STRAND.lower() in ['-','minus','m']:
-    STRAND='-'
-else:
-    STRAND='.'
+args = parser.parse_args()
+
+def which(x,value=True):
+    return [a for a,b in enumerate(x) if b==value]
+
 '''
 'chromosomes' contains the lengths of all chromosomes the that BEDGRAPH contains values for.
 Expects a two-column tab-separated file with:
@@ -64,7 +67,7 @@ Expects a two-column tab-separated file with:
 Provided with the -L argument.
 ''' 
 chromosomes={}
-lengths_file=open(LENGTHS)
+lengths_file=open(args.lengths)
 for line in lengths_file:
     chrom,length=line.rstrip().split('\t')
     chromosomes[chrom]=int(length)
@@ -75,8 +78,8 @@ for chrom in list(chromosomes.keys()):
     mask_positions[chrom]['-']=set()
     mask_positions[chrom]['+']=set()
 
-if BED_UP != 'none':
-    print('Upstream mask: '+BED_UP)
+if args.BED_UP:
+    print('Upstream mask: '+args.BED_UP)
     mask_file=open(BED_UP)    
     for line in mask_file:
         if line[0]=='#':continue
@@ -91,9 +94,9 @@ if BED_UP != 'none':
             mask_positions[chrom][strand].add(start_pos-1)
     mask_file.close()
 
-if BED_DOWN != 'none':
-    print('Downstream mask: '+BED_DOWN)
-    mask_file=open(BED_DOWN)    
+if args.BED_DOWN:
+    print('Downstream mask: '+args.BED_DOWN)
+    mask_file=open(args.BED_DOWN)    
     for line in mask_file:
         if line[0]=='#':continue
         l=line.rstrip().split()
@@ -106,10 +109,10 @@ if BED_DOWN != 'none':
         elif strand=='-':
             mask_positions[chrom][strand].add(end_pos)
     mask_file.close()
-
-if BED_IN != 'none':
-    print('Upstream mask: '+BED_IN)
-    mask_file=open(BED_IN)    
+    
+if args.BED_INSIDE:
+    print('Internal mask: '+args.BED_INSIDE)
+    mask_file=open(args.BED_INSIDE)    
     for line in mask_file:
         if line[0]=='#':continue
         l=line.rstrip().split()
@@ -119,18 +122,134 @@ if BED_IN != 'none':
         strand = l[5]
         mask_positions[chrom][strand].update(set(range(start_pos,end_pos)))
     mask_file.close()
-    
-bedgraph_file=open(BEDGRAPH_IN)
-bedgraph_outfile=open(BEDGRAPH_OUT,'w')
 
-for line in bedgraph_file:
-    l=line.split('\t')
-    chrom=l[0]
-    end=int(l[1])
-    if chrom not in chromosomes:
-        continue
-    if STRAND == 'both' and end not in mask_positions[chrom]['+'] and end not in mask_positions[chrom]['-']:
-        bedgraph_outfile.write(line)
-    elif end not in mask_positions[chrom][STRAND]:
-        bedgraph_outfile.write(line)
-bedgraph_outfile.close()
+if args.PLUS_BG:
+    bedgraph_file=open(args.PLUS_BG)
+    bedgraph_outfile=open(args.PLUS_OUT,'w')
+    
+    for line in bedgraph_file:
+        all_ranges = None
+        positions = None
+        l = line.split('\t')
+        chrom = l[0]
+        start = int(l[1])
+        end = int(l[2])
+        if chrom not in chromosomes:
+            continue
+        
+        positions = [
+            i
+            for i in range(start,end)
+            if not i in mask_positions[chrom]['+']
+        ]
+        
+        if not positions:
+            continue
+        
+        if len(positions) == 1:
+            all_ranges = [(start,end)]
+        else:
+            breaks = which(
+                [
+                    a - b != 1
+                    for a,b in zip(
+                        positions[1:],
+                        positions[:-1]
+                    )
+                ]
+            )
+            if breaks:
+                partitions = [0] + breaks + [len(y)-1]
+                all_ranges = [
+                    (y[a],y[b]+1)
+                    for a,b in zip(
+                        partitions[:-1],
+                        partitions[1:]
+                    )
+                ]
+            else:
+                all_ranges = [(start,end)]
+        if all_ranges:
+            for s,e in all_ranges:
+                if len(l) > 3:
+                    newline = '{}\t{}\t{}\t{}'.format(
+                        chrom,
+                        start,
+                        end,
+                        '\t'.join(l[3:])
+                    )
+                else:
+                    newline = '{}\t{}\t{}\n'.format(
+                        chrom,
+                        start,
+                        end
+                    )
+                bedgraph_outfile.write(newline)
+            
+    bedgraph_outfile.close()
+
+if args.MINUS_BG:
+    bedgraph_file=open(args.MINUS_BG)
+    bedgraph_outfile=open(args.MINUS_OUT,'w')
+    
+    for line in bedgraph_file:
+        all_ranges = None
+        positions = None
+        l = line.split('\t')
+        chrom = l[0]
+        start = int(l[1])
+        end = int(l[2])
+        if chrom not in chromosomes:
+            continue
+        
+        positions = [
+            i
+            for i in range(start,end)
+            if not i in mask_positions[chrom]['-']
+        ]
+        
+        if not positions:
+            continue
+        
+        if len(positions) == 1:
+            all_ranges = [(start,end)]
+        else:
+            breaks = which(
+                [
+                    a - b != 1
+                    for a,b in zip(
+                        positions[1:],
+                        positions[:-1]
+                    )
+                ]
+            )
+            if breaks:
+                partitions = [0] + breaks + [len(y)-1]
+                all_ranges = [
+                    (y[a],y[b]+1)
+                    for a,b in zip(
+                        partitions[:-1],
+                        partitions[1:]
+                    )
+                ]
+            else:
+                all_ranges = [(start,end)]
+        
+        if all_ranges:
+            for s,e in all_ranges:
+                if len(l) > 3:
+                    newline = '{}\t{}\t{}\t{}'.format(
+                        chrom,
+                        start,
+                        end,
+                        '\t'.join(l[3:])
+                    )
+                else:
+                    newline = '{}\t{}\t{}\n'.format(
+                        chrom,
+                        start,
+                        end
+                    )
+                bedgraph_outfile.write(newline)
+    
+    bedgraph_outfile.close()
