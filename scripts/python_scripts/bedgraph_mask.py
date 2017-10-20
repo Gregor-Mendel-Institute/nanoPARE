@@ -81,7 +81,7 @@ for chrom in list(chromosomes.keys()):
 
 if args.BED_UP:
     print('Upstream mask: '+args.BED_UP)
-    mask_file=open(BED_UP)    
+    mask_file=open(args.BED_UP)    
     for line in mask_file:
         if line[0]=='#':continue
         l=line.rstrip().split()
