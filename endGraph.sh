@@ -120,8 +120,8 @@ then
         -M $temp_dir/TSS_minus.bedgraph \
         -PO $temp_dir/TSS_plus_mask.bedgraph \
         -MO $temp_dir/TSS_minus_mask.bedgraph \
-        -U=$resource_dir/TSS_mask_up.bed \
-        $resource_dir/length.table
+        -U $resource_dir/TSS_mask_up.bed \
+        -L $resource_dir/length.table
 fi
 if [ $TES == "true" ]
 then
@@ -131,7 +131,7 @@ then
         -PO $temp_dir/TES_plus_mask.bedgraph \
         -MO $temp_dir/TES_minus_mask.bedgraph \
         -D $resource_dir/TES_mask_down.bed \
-        $resource_dir/length.table
+        -L $resource_dir/length.table
 fi
 
 if [ -z $UUG_PLUS ]
@@ -144,8 +144,8 @@ else
         -M $UUG_MINUS \
         -PO $temp_dir/uuG_plus_mask.bedgraph \
         -MO $temp_dir/uuG_minus_mask.bedgraph \
-        -U=$resource_dir/TSS_mask_up.bed \
-        $resource_dir/length.table
+        -U $resource_dir/TSS_mask_up.bed \
+        -L $resource_dir/length.table
 fi
 
 
