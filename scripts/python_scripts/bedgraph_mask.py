@@ -160,9 +160,9 @@ if args.PLUS_BG:
                 ]
             )
             if breaks:
-                partitions = [0] + breaks + [len(y)-1]
+                partitions = [0] + breaks + [len(positions)-1]
                 all_ranges = [
-                    (y[a],y[b]+1)
+                    (positions[a],positions[b]+1)
                     for a,b in zip(
                         partitions[:-1],
                         partitions[1:]
@@ -225,9 +225,9 @@ if args.MINUS_BG:
                 ]
             )
             if breaks:
-                partitions = [0] + breaks + [len(y)-1]
+                partitions = [0] + breaks + [len(positions)-1]
                 all_ranges = [
-                    (y[a],y[b]+1)
+                    (positions[a],positions[b]+1)
                     for a,b in zip(
                         partitions[:-1],
                         partitions[1:]
