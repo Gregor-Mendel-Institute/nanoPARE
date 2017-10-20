@@ -16,8 +16,9 @@ parser = argparse.ArgumentParser(description=desc)
 
 # add arguments to the ArgumentParser
 parser.add_argument(
-    'lengths', type=str, 
-    help='filepath to chromosome lengths table'
+    '-L','--lengths', dest='lengths', type=str, 
+    help='filepath to chromosome lengths table',
+    required=True
 )
 parser.add_argument(
     '-P', '--plus', dest='PLUS_BG', type=str, 
