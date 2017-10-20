@@ -308,14 +308,15 @@ do
     for strand in plus minus
     do
         kernel_density_command="python \
-        $python_dir/bedgraph_kernel_density.py \
-        -B $temp_dir/"$readtype"_"$strand"_subtract.bedgraph \
-        -O $temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
-        -L $resource_dir/length.table \
-        -K $KERNEL \
-        -H $bandwidth \
-        --cores $CPUS
-        -P"
+            $python_dir/bedgraph_kernel_density.py \
+            -B=$temp_dir/"$readtype"_"$strand"_subtract.bedgraph \
+            -O=$temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
+            -L=$resource_dir/length.table \
+            -K=$KERNEL \
+            -H=$bandwidth \
+            -S=3 \
+            -D=3 \
+            -P=True"
         echo $kernel_density_command
         eval $kernel_density_command
         if [ ! -f $temp_dir/"$readtype"_"$strand"_smooth.bedgraph ]
