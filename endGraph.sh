@@ -194,13 +194,13 @@ then
     TSS_scale=$(printf "%.2f" $(echo "(${TSS_plus_scales[0]} + ${TSS_minus_scales[0]}) / 2" | bc -l))
     TSS_bandwidth=$(printf "%.0f" $(echo "(${TSS_plus_scales[1]} + ${TSS_minus_scales[1]}) / 2" | bc -l))
     
-    if [[ $TSS_scale > $SCALE_CAP ]]
+    if [ $(echo "$TSS_scale > $SCALE_CAP" | bc -l) -eq 1 ]
     then    
         TSS_scale=$SCALE_CAP
         echo "TSS hit scale cap of $SCALE_CAP"
     fi
 
-    if [[ $TSS_bandwidth > $BANDWIDTH_CAP ]]
+    if [ $(echo "$TSS_BANDWIDTH > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
     then
         TSS_bandwidth=$BANDWIDTH_CAP
         echo "TSS hit bandwidth cap of $BANDWIDTH_CAP"
@@ -245,13 +245,13 @@ then
     TES_scale=$(printf "%.2f" $(echo "(${TES_plus_scales[0]} + ${TES_minus_scales[0]}) / 2" | bc -l))
     TES_bandwidth=$(printf "%.0f" $(echo "(${TES_plus_scales[2]} + ${TES_minus_scales[2]}) / 2" | bc -l))
     
-    if [[ $TES_scale > $SCALE_CAP ]]
+    if [ $(echo "$TES_scale > $SCALE_CAP" | bc -l) -eq 1 ]
     then
         TES_scale=$SCALE_CAP
         echo "TES hit scale cap of $SCALE_CAP"
     fi
     
-    if [[ $TES_bandwidth > $BANDWIDTH_CAP ]]
+    if [ $(echo "$TES_bandwidth > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
     then
         TES_bandwidth=$BANDWIDTH_CAP
         echo "TES hit bandwidth cap of $BANDWIDTH_CAP"
