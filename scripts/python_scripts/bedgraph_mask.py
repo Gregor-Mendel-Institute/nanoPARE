@@ -42,12 +42,12 @@ parser.add_argument(
 )
 parser.add_argument(
     '-U', '--upstream', dest='BED_UP', type=str, 
-    help='Bed file of features to mask upstream of',
+    help='Bed file of features immediately upstream of a site to mask',
     default=None
 )
 parser.add_argument(
     '-D', '--downstream', dest='BED_DOWN', type=str, 
-    help='Bed file of features to mask downstream of',
+    help='Bed file of immediately downstream of a site to mask',
     default=None
 )
 parser.add_argument(

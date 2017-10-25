@@ -26,8 +26,10 @@ Arguments:
 -I | --iter          Number of iterations of optimization (default = 5)
 -K | --kernel        Kernel function (default = laplace; options: laplace, normal, flat, triangle)
 -S | --setup         If true, performs full environment setup (default = true)
---approach           Approach speed during iterative optimization (default = 0.5; options: 0 < x <= 1)
+-J                   Job number (passed by qsub by default)
+--subset             Subset of transcripts in the annotation GFF to use in final output
 --lmod               Load required modules with Lmod
+--cpus               Number of cores available for multithreaded programs
 
 Each of the above files is required to run Bookend. By default, each option points to an item in the resources directory:
     -5 resources/TSS_plus.bedgraph resources/TSS_minus.bedgraph
@@ -57,7 +59,7 @@ while [ "$1" != "" ]; do
                                 ;;                                
     --lmod )                    LMOD=1
                                 ;;
-    --approach )                shift; APPROACH=$1
+    --subset )                  shift; annotation_subset=$1
                                 ;;
     --cpus )                    shift; CPUS=$1
                                 ;;
@@ -74,6 +76,8 @@ while [ "$1" != "" ]; do
     -A | --annotation )         shift; annotation_gff=$1
                                 ;;
     -I | --iter )               shift; ITERATIONS=$1
+                                ;;
+    -J )                        shift; JOB_NUMBER=$1
                                 ;;
     -K | --kernel )             shift; KERNEL=$1
                                 ;;

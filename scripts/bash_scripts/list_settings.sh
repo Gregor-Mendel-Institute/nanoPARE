@@ -1,6 +1,7 @@
 #!/bin/bash
 
 echo "
+JOB_NUMBER="$JOB_NUMBER"
 root_dir="$root_dir"
 bash_dir="$bash_dir"
 python_dir="$python_dir"
@@ -12,6 +13,7 @@ results_dir="$results_dir"
 
 genome_fasta="$genome_fasta"
 annotation_gff="$annotation_gff"
+annotation_subset="$annotation_subset"
 TSS_PLUS="$TSS_PLUS"
 TSS_MINUS="$TSS_MINUS"
 TES_PLUS="$TES_PLUS"
