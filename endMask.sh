@@ -6,7 +6,7 @@
 # Storing all default global environment variables
 if [ -z "$root_dir" ]
 then
-    root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"/../.. # Temporary $root_dir relative to this script's location if it isn't already in the environment
+    root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Temporary $root_dir relative to this script's location if it isn't already in the environment
 fi
 bash_dir=$root_dir/scripts/bash_scripts
 python_dir=$root_dir/scripts/python_scripts
@@ -78,7 +78,7 @@ echo "Config settings:"
 
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools )
+REQUIRED_MODULES=( --bt )
 . $bash_dir/load_modules.sh
 echo " "
 
@@ -98,12 +98,13 @@ mask=$python_dir/bedgraph_mask.py
 coverage=$python_dir/bed_feature_coverage.py
 samples=($sample_list)
 endmap_folder=$results_dir/EndMap
-endgraph_folder=$results_dir/EndGraph
+endgraph_folder=$temp_dir
 output_folder=$results_dir/EndMask
 data_folder=$output_folder/$SAMPLE_NAME
 
 echo "Samples: ${samples[@]}"
 echo "Sample type: $SAMPLE_NAME"
+mkdir -p $data_folder
 cd $data_folder
 
 echo "Setting up exon reference..."

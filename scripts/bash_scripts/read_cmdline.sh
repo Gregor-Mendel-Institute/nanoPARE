@@ -49,8 +49,7 @@ HELP
 
 if [ $# -eq 0 ]; then
     usage
-    exit 1
-fi
+else
 while [ "$1" != "" ]; do
     case $1 in
     -h | --help )               usage; exit 1
@@ -88,3 +87,5 @@ while [ "$1" != "" ]; do
     esac
     shift
 done
+fi
+

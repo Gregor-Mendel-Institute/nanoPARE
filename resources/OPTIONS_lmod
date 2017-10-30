@@ -1,4 +1,5 @@
 --bedtools BEDTools/2.26.0-foss-2016a
+--bt BEDTools/v2.17.0-goolf-1.4.10
 --bowtie Bowtie/1.1.2-foss-2015b
 --cutadapt cutadapt/1.9.1-foss-2016a-Python-2.7.11
 --rna-star rna-star/2.5.2a-foss-2016a

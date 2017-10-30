@@ -6,7 +6,7 @@
 # Storing all default global environment variables
 if [ -z "$root_dir" ]
 then
-    root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"/../.. # Temporary $root_dir relative to this script's location if it isn't already in the environment
+    root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Temporary $root_dir relative to this script's location if it isn't already in the environment
 fi
 bash_dir=$root_dir/scripts/bash_scripts
 python_dir=$root_dir/scripts/python_scripts
@@ -245,6 +245,6 @@ python $python_dir/bedgraph_genome_to_transcripts.py \
 
 echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$SAMPLE_NAME
-mv sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
+mv $sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
 
 echo Pipeline complete!
