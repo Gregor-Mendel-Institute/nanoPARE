@@ -126,7 +126,7 @@ minus_list_uug=()
 for s in ${samples[@]}
 do
     sed "s/\tTSS\./\t"$s"\.TSS\./" \
-        $endgraph_folder/$s/end_features.bed \
+        $endgraph_folder/$s/$SAMPLE_NAME.end_features.bed \
         >> $SAMPLE_NAME.all.bed
     
     plus_list+=($endgraph_folder/$s/TSS_plus_mask.bedgraph)
@@ -178,11 +178,10 @@ bedtools closest \
     -b exons_by_gene.gff \
     > $SAMPLE_NAME.closest_gene.bed
 
-awk '{printf $1"\t"$2"\t"$3"\t"$15"\t"$16"\t"$6"\t"$5"\n"}' $SAMPLE_NAME.closest_gene.bed \
+awk '{printf $1"\t"$2"\t"$3"\tTSS."NR"\t"$16"\t"$6"\t"$15"\n"}' $SAMPLE_NAME.closest_gene.bed \
     > $SAMPLE_NAME.gene.bed
 
-# rm -f $SAMPLE_NAME.closest_gene.bed
-exit 0
+rm -f $SAMPLE_NAME.closest_gene.bed
 
 echo "Splitting capped and noncapped features..."
 
