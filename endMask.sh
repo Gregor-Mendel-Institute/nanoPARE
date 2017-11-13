@@ -165,6 +165,7 @@ bedtools merge \
 grep -v -P '\t1\t' $SAMPLE_NAME.merged.bed \
     > $SAMPLE_NAME.rep.bed
 
+
 rm $SAMPLE_NAME.all.bed $SAMPLE_NAME.merged.bed
 
 bedfile=$SAMPLE_NAME.rep.bed
@@ -178,17 +179,27 @@ bedtools closest \
     -b exons_by_gene.gff \
     > $SAMPLE_NAME.closest_gene.bed
 
+# Ath_chr1        310073  310434  Ath_chr1.636;Ath_chr1.672;Ath_chr1.652  3       +       Ath_chr1        TAIR10  exon    310316  310981  .       +       .       AT1G01900       0
 awk '{printf $1"\t"$2"\t"$3"\tTSS."NR"\t"$16"\t"$6"\t"$15"\n"}' $SAMPLE_NAME.closest_gene.bed \
     > $SAMPLE_NAME.gene.bed
 
-rm -f $SAMPLE_NAME.closest_gene.bed
+# Adding a merged peak position ot each replicable feature, keeping both the closest gene ID and distance
+python $python_dir/bed_find_peaks.py \
+    -I $SAMPLE_NAME.gene.bed \
+    -O $SAMPLE_NAME.all_features.bed \
+    -BP $SAMPLE_NAME.plus.bedgraph \
+    -BM $SAMPLE_NAME.minus.bedgraph \
+    -L $length_table \
+    -V pass
+
+rm -f $SAMPLE_NAME.closest_gene.bed $SAMPLE_NAME.gene.bed
 
 echo "Splitting capped and noncapped features..."
 
 python $python_dir/bed_uug_filter.py \
     -C $SAMPLE_NAME.capped.bed \
     -U $SAMPLE_NAME.noncapped.bed \
-    $SAMPLE_NAME.gene.bed \
+    $SAMPLE_NAME.all_features.bed \
     $SAMPLE_NAME.plus.bedgraph \
     $SAMPLE_NAME.minus.bedgraph \
     $SAMPLE_NAME.uuG.plus.bedgraph \
