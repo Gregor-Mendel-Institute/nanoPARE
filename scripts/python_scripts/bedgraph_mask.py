@@ -86,6 +86,8 @@ if args.BED_UP:
         if line[0]=='#':continue
         l=line.rstrip().split()
         chrom=l[0]
+        if chrom not in chromosomes:
+            continue
         start_pos=int(l[1])
         end_pos=int(l[2])
         strand = l[5]

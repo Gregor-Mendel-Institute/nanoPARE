@@ -24,6 +24,7 @@ match_file   - Full path of a space-delimited file with information on searches 
 genome_FASTA = sys.argv[1]
 match_file   = sys.argv[2]
 
+parallel = False
 sort_results = False
 
 try:
@@ -91,7 +92,7 @@ def writer(merge_filename,shared_queue,stop_token):
             return
         dest_file.write(line)
 
-def IUPAC_matches(sequence,dist,chrom,queue):
+def IUPAC_matches(sequence,dist,chrom,queue,parallel):
     """Passes BED-formatted lines of all matches to an IUPAC sequence to queue.
     
     Usage:
@@ -155,18 +156,20 @@ def IUPAC_matches(sequence,dist,chrom,queue):
                 )
             )
         for h,s in all_hits:
-            queue.put(
-                '\t'.join(
-                    [
-                        chrom,
-                        str(h[0]),
-                        str(h[1]),
-                        chrom + '_' + str(hit_number),
-                        '0',
-                        s
-                    ]
-                ) + '\n'
-            )
+            line_to_write = '\t'.join(
+                [
+                    chrom,
+                    str(h[0]),
+                    str(h[1]),
+                    chrom + '_' + str(hit_number),
+                    '0',
+                    s
+                ]
+            ) + '\n'
+            if parallel:
+                queue.put(line_to_write)
+            else:
+                queue.write(line_to_write)
             hit_number+=1
     # Iterative search performs filtering and output dynamically
     # Output will not be sorted
@@ -183,18 +186,20 @@ def IUPAC_matches(sequence,dist,chrom,queue):
                 else:
                     continue
                 hit_number += 1
-                queue.put(
-                    '\t'.join(
-                        [
-                            chrom,
-                            str(hit_span[0]),
-                            str(hit_span[1]),
-                            chrom + '_' + str(hit_number),
-                            '0',
-                            '+'
-                        ]
-                    ) + '\n'
-                )
+                line_to_write = '\t'.join(
+                    [
+                        chrom,
+                        str(hit_span[0]),
+                        str(hit_span[1]),
+                        chrom + '_' + str(hit_number),
+                        '0',
+                        '+'
+                    ]
+                ) + '\n'
+                if parallel:
+                    queue.put(line_to_write)
+                else:
+                    queue.write(line_to_write)
         
         start_end_pairs = {}
         for j,jl in zip(seq2,[len(re.sub('\[.+?\]','1',l)) for l in seq2]):
@@ -208,18 +213,21 @@ def IUPAC_matches(sequence,dist,chrom,queue):
                 else:
                     continue
                 hit_number += 1
-                queue.put(
-                    '\t'.join(
-                        [
-                            chrom,
-                            str(hit_span[0]),
-                            str(hit_span[1]),
-                            chrom + '_' + str(hit_number),
-                            '0',
-                            '-'
-                        ]
-                    ) + '\n'
-                )
+                line_to_write = '\t'.join(
+                    [
+                        chrom,
+                        str(hit_span[0]),
+                        str(hit_span[1]),
+                        chrom + '_' + str(hit_number),
+                        '0',
+                        '-'
+                    ]
+                ) + '\n'
+                if parallel:
+                    queue.put(line_to_write)
+                else:
+                    queue.write(line_to_write)
+    
     print('{} hits: {}'.format(chrom,hit_number))
     
 
@@ -284,40 +292,57 @@ if __name__ == '__main__':
         except:
             print('Wrong number of columns in line '+str(linecounter))
             continue
-        queue = mp.Queue()
-        STOP_TOKEN = "FINISHED"
-        writer_process = mp.Process(
-            target=writer,
-            args=(out_folder+BED_filename+'.bed',queue,STOP_TOKEN)
-        )
-        writer_process.start()
-        all_threads = []
-        chromosomes_by_size = [
-            k for v,k in sorted(
-                [(v,k) for k,v in chromosomes.items()]
-                ,reverse=True
+        if parallel:
+            queue = mp.Queue()
+            STOP_TOKEN = "FINISHED"
+            writer_process = mp.Process(
+                target=writer,
+                args=(out_folder+BED_filename+'.bed',queue,STOP_TOKEN)
             )
-        ]
-        print("SEARCH: {}".format(search_sequence))
-        for chrom in chromosomes_by_size:
-            all_threads.append(
-                mp.Process(
-                    target=IUPAC_matches,
-                    args=(
-                        search_sequence,
-                        mismatches,
-                        chrom,
-                        queue
+            writer_process.start()
+            all_threads = []
+            chromosomes_by_size = [
+                k for v,k in sorted(
+                    [(v,k) for k,v in chromosomes.items()]
+                    ,reverse=True
+                )
+            ]
+            print("SEARCH: {}".format(search_sequence))
+            for chrom in chromosomes_by_size:
+                all_threads.append(
+                    mp.Process(
+                        target=IUPAC_matches,
+                        args=(
+                            search_sequence,
+                            mismatches,
+                            chrom,
+                            queue,
+                            True
+                        )
                     )
                 )
-            )
-        for i in range(len(all_threads)):
-            all_threads[i].start()
-        while len(mp.active_children()) > 1:
-            time.sleep(1)
-        queue.put("FINISHED")
-        while len(mp.active_children()) > 0:
-            time.sleep(1)
+            
+            for i in range(len(all_threads)):
+                all_threads[i].start()
+            while len(mp.active_children()) > 1:
+                time.sleep(1)
+            queue.put("FINISHED")
+            while len(mp.active_children()) > 0:
+                time.sleep(1)
+        else:
+            print("SEARCH: {}".format(search_sequence))
+            queue = open(out_folder+BED_filename+'.bed','w')
+            for chrom in sorted(chromosomes.keys()):
+                IUPAC_matches(
+                    search_sequence,
+                    mismatches,
+                    chrom,
+                    queue,
+                    False
+                )
+            
+            queue.close()
+
         
     
 print('Sequence search complete.')

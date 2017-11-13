@@ -213,7 +213,7 @@ print('# {} reference transcripts: {}'.format(
 
 # 'picked_IDs' is an array of IDs to use from the reference_GFF
 if args.subset:
-    picked_IDs = [i.rstrip() for i in open(args.subset).readlines()]
+    picked_IDs = [i.rstrip().split('\t')[0] for i in open(args.subset).readlines()]
 else:
     picked_IDs = ref_IDs
 
