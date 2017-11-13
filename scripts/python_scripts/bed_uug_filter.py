@@ -138,16 +138,7 @@ for line in feature_file:
     start_pos = int(l[1])
     end_pos = int(l[2])
     peak_pos = int(l[6]) + start_pos
-    if len(l) == 8:
-        if l[7] == '-':
-            secondary_peaks = []
-        else:
-            secondary_peaks = [
-                int(i) + start_pos
-                for i in l[7].split(',')
-            ]
-    else:
-        secondary_peaks = []
+    secondary = l[-1]
     
     readname = l[3]
     readtype = l[3].split('.')[0]
@@ -160,7 +151,7 @@ for line in feature_file:
         (start_pos,end_pos),
         score,
         readname,
-        secondary_peaks
+        secondary
     ]
 
 feature_file.close()
