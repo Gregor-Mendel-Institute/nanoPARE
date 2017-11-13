@@ -180,7 +180,7 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
         return
     
     for i in bed_dict[chrom]:
-        start,end,strand,name,score = i
+        start,end,strand,name,score,other = i
         vector = coverage[strand][chrom][start:end]
         if continuous:
             peaks = find_peaks(vector)
@@ -268,7 +268,7 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                     str(score),
                     strand,
                     str(dompeak),
-                    otherpeaks
+                    other
                 ]
             ) + '\n'
         )
@@ -330,9 +330,10 @@ for line in file:
     name = l[3]
     score = l[4]
     strand = l[5]
+    other = l[6]
     if chrom not in bed_dict:
         bed_dict[chrom] = []
-    bed_dict[chrom] += [(start,end,strand,name,score)]
+    bed_dict[chrom] += [(start,end,strand,name,score,other)]
     
 # Begins identifying continuous features, outputting a BED file.
 # Example line:

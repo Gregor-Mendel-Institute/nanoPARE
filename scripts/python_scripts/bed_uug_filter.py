@@ -132,8 +132,8 @@ for chromosome in chromosomes.keys():
 feature_file = open(args.bed_in)
 for line in feature_file:
     if line[0] == '#':continue
-    l = line.rstrip().split()
-    score = float(l[4])
+    l = line.rstrip().split('\t')
+    score = l[4]
     chrom = l[0]
     start_pos = int(l[1])
     end_pos = int(l[2])
@@ -141,7 +141,7 @@ for line in feature_file:
     secondary = l[-1]
     
     readname = l[3]
-    readtype = l[3].split('.')[0]
+    readtype = 'TSS'
     if l[5] == '+':
         strand = 'plus'
     elif l[5] == '-':
@@ -270,7 +270,7 @@ for readtype in ['TSS']:
                         str(score),
                         s,
                         str(int(peakpos)-start),
-                        ','.join([str(i - start) for i in secondary]),
+                        secondary,
                         str(round(percent_uuG,3))
                     ]
                 ) + '\n'
