@@ -126,7 +126,7 @@ minus_list_uug=()
 for s in ${samples[@]}
 do
     sed "s/\tTSS\./\t"$s"\.TSS\./" \
-        $endgraph_folder/$s/$SAMPLE_NAME.end_features.bed \
+        $endgraph_folder/$s/$s.end_features.bed \
         >> $SAMPLE_NAME.all.bed
     
     plus_list+=($endgraph_folder/$s/TSS_plus_mask.bedgraph)
