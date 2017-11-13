@@ -104,6 +104,7 @@ data_folder=$output_folder/$SAMPLE_NAME
 
 echo "Samples: ${samples[@]}"
 echo "Sample type: $SAMPLE_NAME"
+rm -R $data_folder
 mkdir -p $data_folder
 cd $data_folder
 
@@ -180,7 +181,8 @@ bedtools closest \
 awk '{printf $1"\t"$2"\t"$3"\t"$15"\t"$16"\t"$6"\t"$5"\n"}' $SAMPLE_NAME.closest_gene.bed \
     > $SAMPLE_NAME.gene.bed
 
-rm -f $SAMPLE_NAME.closest_gene.bed
+# rm -f $SAMPLE_NAME.closest_gene.bed
+exit 0
 
 echo "Splitting capped and noncapped features..."
 

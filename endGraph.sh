@@ -361,11 +361,23 @@ then
 fi
 bedtools sort -i $temp_dir/end_features_temp.bed > $temp_dir/end_features.bed
 
+python $python_dir/bed_find_peaks.py \
+    -I $temp_dir/end_features.bed \
+    -L $resource_dir/length.table \
+    -O $temp_dir/$SAMPLE_NAME.rpm.features.bed \
+    -BP $temp_dir/TSS_plus_mask.bedgraph \
+    -BM $temp_dir/TSS_minus_mask.bedgraph \
+    -V rpm
+
+awk -F'[\t]' '{if ($5 >= .5){ print }}' $temp_dir/$SAMPLE_NAME.rpm.features.bed > $temp_dir/$SAMPLE_NAME.end_features.bed
+
 rm $temp_dir/end_features_temp.bed \
+    $temp_dir/end_features.bed \
+    $temp_dir/$SAMPLE_NAME.rpm.features.bed \
     $temp_dir/TSS_plus_features.bed \
     $temp_dir/TSS_minus_features.bed \
     $temp_dir/TES_plus_features.bed \
-    $temp_dir/TES_minus_features.bed
+    $temp_dir/TES_minus_features.bed \
 
 rm $temp_dir/TSS_plus_subtract.bedgraph \
     $temp_dir/TSS_minus_subtract.bedgraph \
@@ -376,32 +388,11 @@ for readtype in ${readtypes[@]}
 do
     for strand in plus minus
     do
-    rm $temp_dir/"$readtype"_"$strand".bedgraph
+        rm $temp_dir/"$readtype"_"$strand".bedgraph
     done
 done
 
 echo "Phase 3.4 complete."
-
-### PHASE 3.5: CAP PREDICTION ###
-echo "#################################"
-echo "### PHASE 3.5: CAP PREDICTION ###"
-echo "#################################"
-echo " "
-if [ -z $UUG_PLUS ]
-then
-    echo "uuG files not provided. Skipping cap prediction."
-else
-    echo "uuG files: $UUG_PLUS $UUG_MINUS"
-    python $python_dir/bed_uug_filter.py \
-        -C $temp_dir/capped_features.bed \
-        -U $temp_dir/uncapped_features.bed \
-        $temp_dir/end_features.bed \
-        $temp_dir/TSS_plus_mask.bedgraph \
-        $temp_dir/TSS_minus_mask.bedgraph \
-        $temp_dir/uuG_plus_mask.bedgraph \
-        $temp_dir/uuG_minus_mask.bedgraph \
-        $genome_fasta
-fi
 
 
 echo "PHASE 3 complete!"
