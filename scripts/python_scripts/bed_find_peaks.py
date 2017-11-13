@@ -41,7 +41,7 @@ parser.add_argument(
 parser.add_argument(
     '-V', '--value', dest='value', type=str,
     help='type of score to output in bed file',
-    choices=['sum','mean','max','winsor','period','byrank','allvalues'], default='sum'
+    choices=['pass','sum','rpm','mean','max','winsor','period','byrank','allvalues'], default='pass'
 )
 
 args = parser.parse_args()
@@ -195,7 +195,9 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                 otherpeaks = ','.join([str(j) for j in peaks[1:]])
             else:
                 otherpeaks = '.'
-        if args.value == 'winsor':
+        if args.value == 'pass':
+            score = score
+        elif args.value == 'winsor':
             # set a cutoff of 90% of the total score
             target = sum(vector)*.9
             sv = sorted(vector,reverse=True)
@@ -251,6 +253,8 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                 score = '0:0'
             else:
                 score = ','.join(scorevector)
+        elif args.value == 'rpm':
+            score = round(float(sum(vector))/readnumber*1000000,2)
         else:
             score = sum(vector)
         
@@ -309,6 +313,11 @@ for file in args.bedgraph_minus:
         for i in range(int(start),int(end)):
             coverage['-'][chrom][i] += count
     coverage_file.close()
+
+readnumber = int(
+    sum([sum(i) for i in coverage['+'].values()]) +
+    sum([sum(i) for i in coverage['+'].values()])
+)
 
 # Imports input bed file, organizing by chromosome
 bed_dict = {}

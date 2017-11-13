@@ -151,7 +151,10 @@ for line in feature_file:
     
     readname = l[3]
     readtype = l[3].split('.')[0]
-    strand = l[3].split('.')[1]
+    if l[5] == '+':
+        strand = 'plus'
+    elif l[5] == '-':
+        strand = 'minus'
     
     features[readtype + strand][chrom][peak_pos] = [
         (start_pos,end_pos),
