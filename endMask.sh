@@ -147,8 +147,18 @@ echo "Bedgraph uuG files +: "${plus_list_uug[@]}
 echo "Bedgraph uuG files -: "${minus_list_uug[@]}
 bedtools unionbedg -i ${plus_list_uug[@]} > combined_plus.bedgraph
 bedtools unionbedg -i ${minus_list_uug[@]} > combined_minus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"$4+$5+$6"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.uuG.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"$4+$5+$6"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.uuG.minus.bedgraph
+
+colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
+i=4
+sumstring='$4'
+while [ "$i" -lt "$colnum" ]
+do
+  i=$(($i + 1))
+  sumstring+='+$'$i
+done
+
+awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.uuG.plus.bedgraph
+awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.uuG.minus.bedgraph
 rm combined_*us.bedgraph
 echo "Merged coverage files generated."
 
@@ -235,7 +245,6 @@ python $mask \
 -MO $SAMPLE_NAME.capmask.minus.bedgraph \
 -I $SAMPLE_NAME.capped.bed \
 -L $length_table
-
 
 ###########################
 # CALCULATE READ COVERAGE #
