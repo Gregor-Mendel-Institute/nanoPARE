@@ -28,6 +28,10 @@ if [ -z "$genome_fasta" ]
 then
     genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
 fi
+if [ -z "$transcript_fasta" ]
+then
+    transcript_fasta=$resource_dir/transcript.fasta
+fi
 if [ -z "$reference_table" ]
 then
     reference_table=$resource_dir/reference_table_EndGene.txt
@@ -129,7 +133,7 @@ python $python_dir/bedgraph_genome_to_transcripts.py \
 
 python $python_dir/bedgraph_dominant_transcripts.py \
     -I $SAMPLE_NAME.all.transcript.bedgraph \
-    -F $genome_fasta \
+    -F $transcript_fasta \
     -O $SAMPLE_NAME.dom.transcript.bedgraph \
     -L $SAMPLE_NAME.dominant_transcript_lengths.tsv
 
@@ -140,6 +144,7 @@ bedgraph_list=()
 for s in ${samples[@]}
 do
     # Perform cap masking on all 5' end bedgraphs (genome level)
+    echo Capmasking: $s
     python $mask \
         -P $endmap_folder/$s/"$s"_plus.5p.bedgraph \
         -M $endmap_folder/$s/"$s"_minus.5p.bedgraph \
@@ -149,6 +154,7 @@ do
         -L $length_table
     
     # Generate dominant transcript-level cap masked bedgraphs
+    echo Converting to transcripts: $s
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $SAMPLE_NAME.dominant_transcript_lengths.tsv \
         --output $s.transcript.capmasked.bedgraph \
@@ -158,8 +164,9 @@ do
         $genome_fasta
     
     # Additionally mask TSO sequences in transcript-level bedgraphs
+    echo TSO masking: $s
     python $mask \
-        -P --output $s.transcript.capmasked.bedgraph \
+        -P $s.transcript.capmasked.bedgraph \
         -PO $data_folder/$s.transcript.bedgraph \
         -U $tso_mask_file \
         -L $SAMPLE_NAME.dominant_transcript_lengths.tsv
