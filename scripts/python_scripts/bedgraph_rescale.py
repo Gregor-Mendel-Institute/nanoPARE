@@ -38,6 +38,10 @@ parser.add_argument(
     help='maximum bandwidth', default=50
 )
 parser.add_argument(
+    '--minband', dest='minband', type=int,
+    help='minimum bandwidth', default=10
+)
+parser.add_argument(
     '--position', dest='position', type=str,
     help='only examines the relevant terminal exon',
     default='all'
@@ -288,12 +292,12 @@ else:
     end_proportions = [sum([j for j in end_meta[(args.flanking-i):(args.flanking+i+1)] if j>0])/end_sum for i in range(args.maxband)]+[1]
     end_band = min(which([i>=.6827 for i in end_proportions]))
 
-if start_band == 0:
-    start_band = args.maxband
+if start_band < args.minband:
+    start_band = args.minband
 
-if end_band == 0:
-    end_band = args.maxband
-    
+if end_band < args.minband:
+    end_band = args.minband
+
 print('# scaling_factor\tstart_band\tend_band')
 print('{}\t{}\t{}'.format(
     scaling_factor,
