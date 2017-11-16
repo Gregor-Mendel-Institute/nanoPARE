@@ -234,6 +234,7 @@ then
         -A $annotation_gff \
         -S + \
         --position TES \
+        --align \
         > $temp_dir/TES_scale_plus.txt
         
     python $python_dir/bedgraph_rescale.py \
@@ -242,6 +243,7 @@ then
         -A $annotation_gff \
         -S - \
         --position TES \
+        --align \
         > $temp_dir/TES_scale_minus.txt
     
     TES_plus_scales=( $(tail -n 1 $temp_dir/TES_scale_plus.txt) )

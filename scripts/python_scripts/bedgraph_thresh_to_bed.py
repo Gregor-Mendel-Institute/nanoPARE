@@ -114,7 +114,7 @@ def find_bed_features(chrom,chromlen,queue):
     starts = which(edges, 1)
     ends = which(edges, -1)
     if len(starts) > len(ends):
-        ends += chromlen
+        ends += [chromlen]
     for chromStart,chromEnd in zip(starts,ends):
         if chromEnd - chromStart >= args.minimum:
             featurecount += 1
