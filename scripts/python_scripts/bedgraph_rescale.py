@@ -38,11 +38,15 @@ parser.add_argument(
     help='maximum bandwidth', default=50
 )
 parser.add_argument(
+    '--position', dest='position', type=str,
+    help='only examines the relevant terminal exon',
+    default='all'
+)
+parser.add_argument(
     '--align', dest='align',
     help='Align highest points when calculating metaplot',
     action='store_true'
 )
-
 
 args = parser.parse_args()
 
@@ -87,51 +91,12 @@ for line in coverage_file:
     for i in range(int(start),int(end)):
         neg_coverage[chrom][i] = count
 
-# TODO: retool gff_utils to import gff3 format files
-ref_transcripts = {}
-refGFF = open(args.reference_GFF)
-for line in refGFF:
-    if line[0] == '#':continue
-    chrom,source,gtype,start,end,score,strand,phase,other = line.rstrip().split('\t')
-    if gtype != 'exon':
-        continue
-    
-    parent = re.search('^.*;?Parent=([^;]+);?.*$',other).groups()[0]
-    ID = re.search('ID=(.+?)[\.:;].+$',other)
-    if ID:
-        ID = ID.groups()[0]
-    else:
-        ID = parent.split('\.')[0]
-    
-    iso_length = len(re.findall(',',parent))+1
-    isos = re.search(','.join([ID+'(\.[0-9]+)?']*iso_length),parent).groups()
-    iso_ID = parent.split(',')
-    for i in iso_ID:
-        ref_transcripts[i] = ref_transcripts.get(i,{})
-        if gtype != 'miRNA_primary_transcript':
-            exon_number = re.search(
-                'ID=' + ID + ':(pseudogenic_)?exon:([0-9]+).*;Parent.+$',
-                other
-            )
-            if exon_number:
-                exon_number = exon_number.groups()[1]
-            else:
-                exon_number = str(max([int(j) for j in ref_transcripts[i].get('exon_nums',['0'])])+1)
-        else:
-            exon_number = '1'
-    
-    for i in isos:
-        if i:
-            iso_ID = ID + i
-        else:
-            iso_ID = ID
-        
-        ref_transcripts[iso_ID]['chromosome'] = chrom
-        ref_transcripts[iso_ID]['strand'] = strand
-        ref_transcripts[iso_ID]['start'] = ref_transcripts[iso_ID].get('start',[])+[int(start)]
-        ref_transcripts[iso_ID]['end'] = ref_transcripts[iso_ID].get('end',[])+[int(end)]
-        ref_transcripts[iso_ID]['exon_nums'] = ref_transcripts[iso_ID].get('exon_nums',[])+[exon_number]  
-        
+input_filetype = args.reference_GFF.split('.')[-1].lower()
+if input_filetype == 'gff':
+    input_filetype = 'gff3'
+
+ref_transcripts = gu.get_file_content(args.reference_GFF,input_filetype)
+
 ref_IDs = sorted(list(ref_transcripts.keys()))
 print('# {} reference transcripts: {}'.format(
     len(ref_IDs),
@@ -152,8 +117,8 @@ end_meta_neg = [0]*metalength
 for ID in ref_IDs:
     # current_transcript = ref_transcripts[ID].data
     current_transcript = ref_transcripts[ID]
-    chrom = current_transcript['chromosome']
-    strand = current_transcript['strand']
+    chrom = current_transcript.chrom
+    strand = current_transcript.strand
     if strand != args.strand:
         continue
     
@@ -167,17 +132,30 @@ for ID in ref_IDs:
     # subfeatures = ref_transcripts[ID].subfeatures
     # exon_starts = sorted([int(i.data['start']) for i in subfeatures])
     # exon_ends = sorted([int(i.data['end']) for i in subfeatures])
-    exon_starts = sorted([int(i) for i in current_transcript['start']])
-    exon_ends = sorted([int(i) for i in current_transcript['end']])
+    exon_starts = current_transcript.get_exon_start()
+    exon_ends = current_transcript.get_exon_end()
     exon_starts[0] = exon_starts[0] - args.flanking
     exon_ends[-1] = exon_ends[-1] + args.flanking
     if exon_starts[0] < 0:
         exon_starts[0] = 0
     
-    # Make a list of all nucleotide positions in the input transcript
-    positions = flatten(
-        [list(range(a - 1, b)) for a,b in zip(exon_starts, exon_ends)]
-    )
+    if args.position in ['5','5p','start','TSS']:
+        # Check the strand of the transcript, and keep only the relevant terminal exon
+        if strand == '+':
+            positions = list(range(exon_starts[0] - 1, exon_ends[0]))
+        elif strand == '-':
+            positions = list(range(exon_starts[-1] - 1, exon_ends[-1]))
+    elif args.position in ['3','3p','end','TES']:
+        if strand == '+':
+            positions = list(range(exon_starts[-1] - 1, exon_ends[-1]))
+        elif strand == '-':
+            positions = list(range(exon_starts[0] - 1, exon_ends[0]))
+    else:
+        # Make a list of all nucleotide positions in the input transcript
+        positions = flatten(
+            [list(range(a - 1, b)) for a,b in zip(exon_starts, exon_ends)]
+        )
+    
     positions = [i for i in positions if i > 0]
     
     # Get read coverage at each position with coverage
@@ -199,13 +177,8 @@ for ID in ref_IDs:
     max_neg = max(neg)
     max_both = max([max_pos,max_neg])
     
-    if max_pos == 0 or max_neg == 0:
+    if max_pos < 1 or max_neg < 1:
         continue
-    
-    # nonzero_pos = [i for i in pos if i]
-    # nonzero_neg = [i for i in neg if i]
-    # mean_pos = sum(nonzero_pos)/len(nonzero_pos)
-    # mean_neg = sum(nonzero_neg)/len(nonzero_neg)
     
     if args.align:
         # Offsets the center of the region to add to
@@ -268,7 +241,7 @@ for ID in ref_IDs:
         s_n_to_add = neg[:metalength]
         e_p_to_add = pos[-metalength:]
         e_n_to_add = neg[-metalength:]
-    
+
     # Add values from the current feature to the metaplots
     start_meta_pos = [
         a + (float(b)/max_both)
@@ -288,7 +261,7 @@ for ID in ref_IDs:
     ]
     
     ratio += float(max_neg)/max_pos
-    #mratio += float(mean_neg)/mean_pos
+    # mratio += float(mean_neg)/mean_pos
     ID_count += 1
 
 print('# {} {} stranded transcripts with positive signal'.format(
@@ -320,7 +293,7 @@ if start_band == 0:
 
 if end_band == 0:
     end_band = args.maxband
-
+    
 print('# scaling_factor\tstart_band\tend_band')
 print('{}\t{}\t{}'.format(
     scaling_factor,

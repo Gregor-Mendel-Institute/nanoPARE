@@ -50,7 +50,7 @@ echo "Config settings:"
 
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools )
+REQUIRED_MODULES=( --bedtools --python )
 . $bash_dir/load_modules.sh
 echo " "
 
@@ -178,6 +178,7 @@ then
         -N $temp_dir/BODY_minus.bedgraph \
         -A $annotation_gff \
         -S + \
+        --position TSS \
         --align \
         > $temp_dir/TSS_scale_plus.txt
     
@@ -187,6 +188,7 @@ then
         -A $annotation_gff \
         -S - \
         --align \
+        --position TSS \
         > $temp_dir/TSS_scale_minus.txt
     
     TSS_plus_scales=( $(tail -n 1 $temp_dir/TSS_scale_plus.txt) )
@@ -231,6 +233,7 @@ then
         -N $temp_dir/BODY_plus.bedgraph \
         -A $annotation_gff \
         -S + \
+        --position TES \
         > $temp_dir/TES_scale_plus.txt
         
     python $python_dir/bedgraph_rescale.py \
@@ -238,6 +241,7 @@ then
         -N $temp_dir/BODY_minus.bedgraph \
         -A $annotation_gff \
         -S - \
+        --position TES \
         > $temp_dir/TES_scale_minus.txt
     
     TES_plus_scales=( $(tail -n 1 $temp_dir/TES_scale_plus.txt) )
@@ -316,7 +320,8 @@ do
             -H=$bandwidth \
             -S=3 \
             -D=3 \
-            -P=True"
+            -P \
+            -c $CPUS"
         echo $kernel_density_command
         eval $kernel_density_command
         if [ ! -f $temp_dir/"$readtype"_"$strand"_smooth.bedgraph ]
