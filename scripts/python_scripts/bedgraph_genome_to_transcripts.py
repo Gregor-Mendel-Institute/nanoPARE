@@ -1,7 +1,6 @@
 import re
 import sys
 import argparse
-import gff_utils as gu
 import fasta_utils as fu
 import multiprocessing as mp
 
