@@ -104,7 +104,7 @@ data_folder=$output_folder/$SAMPLE_NAME
 
 echo "Samples: ${samples[@]}"
 echo "Sample type: $SAMPLE_NAME"
-rm -R $data_folder
+
 mkdir -p $data_folder
 cd $data_folder
 
@@ -262,14 +262,22 @@ awk -F'[\t]' \
     > $SAMPLE_NAME.overlapping.capped.bed
 
 cat $SAMPLE_NAME.overlapping.capped.bed exons.bed > "$SAMPLE_NAME"_gene_features.bed
+rm $SAMPLE_NAME.overlapping.capped.bed
 
 echo "Calculating gene-level total and uncapped read coverage..."
 python $coverage \
-    -F $SAMPLE_NAME.overlapping.capped.bed \
+    -F $SAMPLE_NAME.capped.bed \
     -I ${capped_bedgraphs[@]} \
     -N ${names[@]} \
     -O "$SAMPLE_NAME"_capped_coverage.tsv \
     -L $length_table 
+
+python $coverage \
+    -F $SAMPLE_NAME.noncapped.bed \
+    -I ${capped_bedgraphs[@]} \
+    -N ${names[@]} \
+    -O "$SAMPLE_NAME"_noncapped_coverage.tsv \
+    -L $length_table
 
 python $coverage \
     -F "$SAMPLE_NAME"_gene_features.bed \
@@ -282,7 +290,7 @@ python $coverage \
     -F "$SAMPLE_NAME"_gene_features.bed \
     -I ${noncapped_bedgraphs[@]} \
     -N ${names[@]} \
-    -O "$SAMPLE_NAME"_uncapped_coverage.tsv \
+    -O "$SAMPLE_NAME"_capmasked_coverage.tsv \
     -L $length_table
 
 

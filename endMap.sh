@@ -93,7 +93,7 @@ star_params_allreads="--runMode alignReads \
 --runThreadN $CPUS \
 --runRNGseed 12345 \
 --genomeDir $genome_index_dir \
---readFilesIn $sample_dir/"$SAMPLE_NAME"_cleaned.fastq \
+--readFilesIn $sample_dir/"$SAMPLE_NAME"_filtered.fastq \
 --outFileNamePrefix $sample_dir/star/ \
 --limitBAMsortRAM 30000000000 \
 --alignEndsType Local \
@@ -130,6 +130,8 @@ echo "Trimming transposase adapters with cutadapt"
 cd $sample_dir
 
 # Trim 0, 1, or 2 provided adapter sequences
+
+keep_untrimmed="false"
 adapters=( $(echo $adapter_str | tr "," " ") )
 number_of_adapters=${#adapters[@]}
 echo "Adapters: ${adapters[@]}"
@@ -160,28 +162,45 @@ else
         trim_command="cutadapt \
             -a ${adapters[0]} \
             -o "$SAMPLE_NAME"_adaptertrim.fastq \
+            --untrimmed-output "$SAMPLE_NAME"_untrimmed1.fastq
             "$SAMPLE_NAME".fastq"
 
         echo $trim_command
         eval $trim_command
 
     else
-        cat "$SAMPLE_NAME".fastq > "$SAMPLE_NAME"_adaptertrim.fastq
+        if [[ $keep_untrimmed == "true" ]]
+        then
+            cat "$SAMPLE_NAME".fastq "$SAMPLE_NAME"_untrimmed1.fastq > "$SAMPLE_NAME"_adaptertrim.fastq
+        else
+            cat "$SAMPLE_NAME".fastq > "$SAMPLE_NAME"_adaptertrim.fastq
+        fi
     fi
 fi
 
-python $python_dir/fastq_drop_short_reads.py . "$SAMPLE_NAME"_adaptertrim.fastq "$SAMPLE_NAME"_cleaned.fastq 15
+sizemarker_command="cutadapt \
+    -a 'AGCGTGTAGGGATCCAAA' \
+    -o "$SAMPLE_NAME"_trimmed.fastq \
+    "$SAMPLE_NAME"_adaptertrim.fastq"
+
+echo $sizemarker_command
+eval $sizemarker_command
+
+python $python_dir/fastq_drop_short_reads.py . "$SAMPLE_NAME"_trimmed.fastq "$SAMPLE_NAME"_cleaned.fastq 18
 
 echo "Removing trim intermediates"
-rm -f "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_adaptertrim.fastq
+rm -f "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_adaptertrim.fastq "$SAMPLE_NAME"_trimmed.fastq
 echo "Adapter trimming complete."
+
+echo "Filtering out low-complexity reads..."
+python $python_dir/fastq_complexity_filter.py $sample_dir "$SAMPLE_NAME"_cleaned.fastq "$SAMPLE_NAME"_filtered.fastq 0.15
+rm -f "$SAMPLE_NAME"_cleaned.fastq
 
 echo "### PHASE 2: MAPPING READS TO THE GENOME WITH STAR ###"
 mkdir -p $sample_dir/star
 echo "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
 eval "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
 
-rm "$SAMPLE_NAME"_cleaned.fastq
 if [[ $fastq_file = *.gz ]]
 then
    rm "$SAMPLE_NAME".fastq
@@ -194,7 +213,8 @@ python $python_dir/sam_calculate_coverages.py \
     -I "$SAMPLE_NAME".sam \
     -R TSS \
     --secondary \
-    --allow_naive
+    --allow_naive \
+    --minmatch 18
 
 python $python_dir/sam_calculate_coverages.py \
     -S "$SAMPLE_NAME".5p \
@@ -202,7 +222,8 @@ python $python_dir/sam_calculate_coverages.py \
     -R TSS \
     --secondary \
     --allow_naive \
-    --map_softclip
+    --map_softclip \
+    --minmatch 18
 
 python $python_dir/sam_untemplated_nucleotides.py \
     "$SAMPLE_NAME".sam \
@@ -213,7 +234,8 @@ python $python_dir/sam_calculate_coverages.py \
     -I "$SAMPLE_NAME".uG.sam \
     -R TSS \
     --secondary \
-    --allow_naive
+    --allow_naive \
+    --minmatch 18
 
 rm "$SAMPLE_NAME".sam "$SAMPLE_NAME".uG.sam
 bedtools sort -i "$SAMPLE_NAME"_TSS_plus.bedgraph > "$SAMPLE_NAME"_plus.bedgraph
@@ -232,7 +254,7 @@ rm "$SAMPLE_NAME"_TSS_plus.bedgraph \
     "$SAMPLE_NAME".5p_TSS_plus.bedgraph \
     "$SAMPLE_NAME".5p_TSS_minus.bedgraph
 
-rm "$SAMPLE_NAME"*coverage.bedgraph
+# rm "$SAMPLE_NAME"*coverage.bedgraph
 
 # Calculate transcript_level coverage by parsing the genome coverage values
 python $python_dir/bedgraph_genome_to_transcripts.py \
@@ -245,6 +267,7 @@ python $python_dir/bedgraph_genome_to_transcripts.py \
 
 echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$SAMPLE_NAME
-mv $sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
+cp $sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
+cat $sample_dir/comptable.tsv > $results_dir/EndMap/$SAMPLE_NAME/"$SAMPLE_NAME".comptable.tsv
 
 echo Pipeline complete!

@@ -219,9 +219,11 @@ for readtype in ['TSS']:
                 if strand == 'plus':
                     upstream_seqs = genome[chrom][(start-1):(end-1)]
                 elif strand == 'minus':
-                    upstream_seqs = reversed(
-                        fu.rc(
-                            genome[chrom][(start+1):(end+1)]
+                    upstream_seqs = ''.join(
+                        reversed(
+                            fu.rc(
+                                genome[chrom][(start+1):(end+1)]
+                            )
                         )
                     )
                 
@@ -230,7 +232,10 @@ for readtype in ['TSS']:
                     continue
                 
                 # get positions without a templated upstream G
-                non_tuG = which([i != 'G' for i in upstream_seqs])
+                # non_tuG = which([i != 'G' for i in upstream_seqs])
+                
+                # TRY: treat all positions as informative (capped features seldom have tuGs)
+                non_tuG = list(range(len(upstream_seqs)))
                 
                 # calculate the total reads and uuG reads at non-tuG sites
                 informative_all = sum(
