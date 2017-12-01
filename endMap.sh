@@ -134,7 +134,7 @@ cd $sample_dir
 
 # Trim 0, 1, or 2 provided adapter sequences
 
-keep_untrimmed="false"
+keep_untrimmed="true"
 adapters=( $(echo $adapter_str | tr "," " ") )
 number_of_adapters=${#adapters[@]}
 echo "Adapters: ${adapters[@]}"
@@ -181,15 +181,15 @@ else
     fi
 fi
 
-sizemarker_command="cutadapt \
-    -a 'AGCGTGTAGGGATCCAAA' \
-    -o "$SAMPLE_NAME"_trimmed.fastq \
-    "$SAMPLE_NAME"_adaptertrim.fastq"
+# sizemarker_command="cutadapt \
+    # -a 'AGCGTGTAGGGATCCAAA' \
+    # -o "$SAMPLE_NAME"_trimmed.fastq \
+    # "$SAMPLE_NAME"_adaptertrim.fastq"
 
-echo $sizemarker_command
-eval $sizemarker_command
-
-python $python_dir/fastq_drop_short_reads.py . "$SAMPLE_NAME"_trimmed.fastq "$SAMPLE_NAME"_cleaned.fastq 18
+# echo $sizemarker_command
+# eval $sizemarker_command
+cat "$SAMPLE_NAME"_adaptertrim.fastq > "$SAMPLE_NAME"_trimmed.fastq
+python $python_dir/fastq_drop_short_reads.py . "$SAMPLE_NAME"_trimmed.fastq "$SAMPLE_NAME"_cleaned.fastq 16
 
 echo "Removing trim intermediates"
 rm -f "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_adaptertrim.fastq "$SAMPLE_NAME"_trimmed.fastq
