@@ -219,6 +219,7 @@ python $python_dir/sam_calculate_coverages.py \
     -F $genome_fasta \
     --softclip_type 5p \
     --untemp_out G \
+    --secondary \
     --allow_naive \
     --minmatch 16
 
