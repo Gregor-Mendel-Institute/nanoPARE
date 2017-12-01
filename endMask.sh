@@ -139,8 +139,18 @@ echo "Bedgraph files +: "${plus_list[@]}
 echo "Bedgraph files -: "${minus_list[@]}
 bedtools unionbedg -i ${plus_list[@]} > combined_plus.bedgraph
 bedtools unionbedg -i ${minus_list[@]} > combined_minus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"$4+$5+$6"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"$4+$5+$6"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.minus.bedgraph
+
+colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
+i=4
+sumstring='$4'
+while [ "$i" -lt "$colnum" ]
+do
+  i=$(($i + 1))
+  sumstring+='+$'$i
+done
+
+awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.plus.bedgraph
+awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.minus.bedgraph
 rm combined_*us.bedgraph
 
 echo "Bedgraph uuG files +: "${plus_list_uug[@]}

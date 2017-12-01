@@ -102,11 +102,14 @@ star_params_allreads="--runMode alignReads \
 --alignSJDBoverhangMin 1 \
 --outReadsUnmapped Fastx \
 --outSAMtype BAM Unsorted \
+--outSAMprimaryFlag AllBestScore \
 --outSAMmultNmax 100 \
 --outSAMattributes NH HI AS nM NM MD jM jI XS \
 --outFilterMultimapNmax 100 \
 --outFilterMismatchNmax 2 \
---outFilterMismatchNoverReadLmax 0.1 \
+--outFilterMatchNmin 16 \
+--outFilterMatchNminOverLread 0.9 \
+--outFilterMismatchNoverReadLmax 0.05 \
 --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
 --twopassMode Basic \
 --quantMode GeneCounts"
@@ -208,53 +211,32 @@ fi
 
 echo Generating bedgraph files...
 samtools view -h star/Aligned.out.bam > "$SAMPLE_NAME".sam
-python $python_dir/sam_calculate_coverages.py \
-    -S $SAMPLE_NAME \
-    -I "$SAMPLE_NAME".sam \
-    -R TSS \
-    --secondary \
-    --allow_naive \
-    --minmatch 18
 
 python $python_dir/sam_calculate_coverages.py \
     -S "$SAMPLE_NAME".5p \
     -I "$SAMPLE_NAME".sam \
     -R TSS \
-    --secondary \
+    -F $genome_fasta \
+    --softclip_type 5p \
+    --untemp_out G \
     --allow_naive \
-    --map_softclip \
-    --minmatch 18
+    --minmatch 16
 
-python $python_dir/sam_untemplated_nucleotides.py \
-    "$SAMPLE_NAME".sam \
-    "$SAMPLE_NAME".uG.sam
 
-python $python_dir/sam_calculate_coverages.py \
-    -S "$SAMPLE_NAME".uG \
-    -I "$SAMPLE_NAME".uG.sam \
-    -R TSS \
-    --secondary \
-    --allow_naive \
-    --minmatch 18
-
-rm "$SAMPLE_NAME".sam "$SAMPLE_NAME".uG.sam
-bedtools sort -i "$SAMPLE_NAME"_TSS_plus.bedgraph > "$SAMPLE_NAME"_plus.bedgraph
-bedtools sort -i "$SAMPLE_NAME"_TSS_minus.bedgraph > "$SAMPLE_NAME"_minus.bedgraph
-
-bedtools sort -i "$SAMPLE_NAME".uG_TSS_plus.bedgraph > "$SAMPLE_NAME"_plus.uG.bedgraph
-bedtools sort -i "$SAMPLE_NAME".uG_TSS_minus.bedgraph > "$SAMPLE_NAME"_minus.uG.bedgraph
+rm "$SAMPLE_NAME".sam 
 
 bedtools sort -i "$SAMPLE_NAME".5p_TSS_plus.bedgraph > "$SAMPLE_NAME"_plus.5p.bedgraph
 bedtools sort -i "$SAMPLE_NAME".5p_TSS_minus.bedgraph > "$SAMPLE_NAME"_minus.5p.bedgraph
 
-rm "$SAMPLE_NAME"_TSS_plus.bedgraph \
-    "$SAMPLE_NAME"_TSS_minus.bedgraph \
-    "$SAMPLE_NAME".uG_TSS_plus.bedgraph \
-    "$SAMPLE_NAME".uG_TSS_minus.bedgraph \
-    "$SAMPLE_NAME".5p_TSS_plus.bedgraph \
-    "$SAMPLE_NAME".5p_TSS_minus.bedgraph
+bedtools sort -i "$SAMPLE_NAME".5p_TSS_plus_untemp.bedgraph > "$SAMPLE_NAME"_plus.uG.bedgraph
+bedtools sort -i "$SAMPLE_NAME".5p_TSS_minus_untemp.bedgraph > "$SAMPLE_NAME"_minus.uG.bedgraph
 
-# rm "$SAMPLE_NAME"*coverage.bedgraph
+rm "$SAMPLE_NAME".5p_TSS_plus.bedgraph \
+    "$SAMPLE_NAME".5p_TSS_minus.bedgraph \
+    "$SAMPLE_NAME".5p_TSS_plus_untemp.bedgraph \
+    "$SAMPLE_NAME".5p_TSS_minus_untemp.bedgraph
+
+rm "$SAMPLE_NAME"*coverage.bedgraph
 
 # Calculate transcript_level coverage by parsing the genome coverage values
 python $python_dir/bedgraph_genome_to_transcripts.py \
