@@ -250,7 +250,7 @@ python $python_dir/bedgraph_genome_to_transcripts.py \
 
 echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$SAMPLE_NAME
-cp $sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
+cat $sample_dir/*.bedgraph > $results_dir/EndMap/$SAMPLE_NAME/
 cat $sample_dir/comptable.tsv > $results_dir/EndMap/$SAMPLE_NAME/"$SAMPLE_NAME".comptable.tsv
 
 echo Pipeline complete!

@@ -22,7 +22,7 @@ parser.add_argument(
 parser.add_argument(
     "-R", "--readtype", dest='READTYPE',
     help="Type of reads in input SAM file(s)",
-    choices=['BODY','TSS','TES'], default="BODY", type=str
+    choices=['BODY','TSS','TES','SRNA'], default="BODY", type=str
 )
 parser.add_argument(
     "-F", "--fasta", dest='FASTA',
@@ -52,6 +52,11 @@ parser.add_argument(
 parser.add_argument(
     "--map_softclip", dest='MAP_SOFTCLIP',
     help="If true, maps 5' end regardless of softclipping",
+    default=False, action="store_true"
+)
+parser.add_argument(
+    "--bed", dest='WRITE_BED',
+    help="If true, outputs a BED file for each unique read",
     default=False, action="store_true"
 )
 parser.add_argument(
@@ -219,27 +224,38 @@ def populate_bedgraphs(read_object):
         return
     
     # If multimapper, store in MM and do not change bedgraph dicts
-    nmap = read_object.Nmap
+    nmap = len(read_object.map_locations())
     if nmap > 1:
         minpos = read_object.minpos()
-        cigar  = read_object.mincigar()
+        cigar = read_object.mincigar()
+        seq = None
+        if read_object.seq1:
+            seq = read_object.seq1
+        if read_object.seq2:
+            seq += read_object.seq2
+        if seq:
+            identifier = seq
+        else:
+            identifier = cigar
+        
         read_object.ID = None
         if nmap in MM:
             if minpos in MM[nmap]:
-                if cigar in MM[nmap][minpos]:
-                    MM[nmap][minpos][cigar] = (read_object,MM[nmap][minpos][cigar][1]+1)
+                if identifier in MM[nmap][minpos]:
+                    MM[nmap][minpos][identifier] = (read_object,MM[nmap][minpos][identifier][1]+1)
                 else:
-                    MM[nmap][minpos][cigar] = (read_object,1)
+                    MM[nmap][minpos][identifier] = (read_object,1)
             else:
-                MM[nmap][minpos] = {cigar:(read_object,1)}
+                MM[nmap][minpos] = {identifier:(read_object,1)}
         else:
-            MM[nmap] = {minpos:{cigar:(read_object,1)}}
+            MM[nmap] = {minpos:{identifier:(read_object,1)}}
     else:
         # Parse the mapping information of the uniquely mapping read
         chrom,strand,poslist = read_object.map_locations()[0]
         map_positions = set()
         for pos,cigar,mate in poslist:
             mate_positions = get_mapping_positions(pos,cigar)
+            untemp_nucs = {}
             if args.UNTEMP_OUT:
                 # If untemplated nucleotides are examined...
                 # 1) Collect all softclipped nucleotides
@@ -309,7 +325,12 @@ def populate_bedgraphs(read_object):
                         if chrom not in genome:
                             print('WARNING: chromosome {} not found'.format(chrom))
                             continue
-                        if genome[chrom][p-1] == n:
+                        if strand == '-':
+                            nuc = fu.IUPACcomp[n]
+                        else:
+                            nuc = n
+                        
+                        if genome[chrom][p-1] == nuc:
                             # Softclipped nucleotide matches the genome
                             if p - 1 in mate_positions or p + 1 in mate_positions:
                                 mate_positions.add(p)
@@ -378,6 +399,77 @@ def populate_bedgraphs(read_object):
                     strand = '-'
                 else:
                     strand = '+'
+            
+            if args.WRITE_BED:
+                # Generate a line for a temp BED file
+                temp_seq = ''
+                temp_positions = sorted(list(map_positions))
+                for i in range(len(temp_positions)):
+                    if strand == '+':
+                        nuc_to_add = genome[chrom][temp_positions[i] - 1]
+                    elif strand == '-':
+                        nuc_to_add = fu.IUPACcomp[genome[chrom][temp_positions[i] - 1]]
+                    if i > 0:
+                        if temp_positions[i] > 1 + temp_positions[i-1]:
+                            # non-adjacent nucleotides are separated by a dot
+                            temp_seq += '.'
+                    temp_seq += nuc_to_add
+                
+                left_seq = ''
+                right_seq = ''
+                if args.UNTEMP_OUT and untemp_nucs:
+                    left_nucs = dict([(p,n) for p,n in untemp_nucs.items() if p < min(temp_positions)])
+                    right_nucs = dict([(p,n) for p,n in untemp_nucs.items() if p > max(temp_positions)])
+                    if left_nucs:
+                        left_positions = sorted(list(left_nucs.keys()))
+                        for i in range(len(left_positions)):
+                            nuc_to_add = left_nucs[left_positions[i]]
+                            if i > 0:
+                                if left_positions[i] > 1 + left_positions[i-1]:
+                                    # non-adjacent nucleotides are separated by a dot
+                                    left_seq += '.'
+                            left_seq += nuc_to_add
+                    if right_nucs:
+                        right_positions = sorted(list(right_nucs.keys()))
+                        for i in range(len(right_positions)):
+                            nuc_to_add = right_nucs[right_positions[i]]
+                            if i > 0:
+                                if right_positions[i] > 1 + right_positions[i-1]:
+                                    # non-adjacent nucleotides are separated by a dot
+                                    right_seq += '.'
+                            right_seq += nuc_to_add
+                        
+                if strand == '+':
+                    head_seq = left_seq
+                    tail_seq = right_seq
+                elif strand == '-':
+                    # Reverse the templated string
+                    head_seq = right_seq[::-1]
+                    temp_seq = temp_seq[::-1]
+                    tail_seq = left_seq[::-1]
+                
+                full_read = head_seq + temp_seq + tail_seq
+                read_length = len(''.join(full_read.split('.')))
+                
+                # chrom	start	end	unique_name	read_num	strand	head [untemp 5']	templated sequence	tail  [untemp 3']
+                temp_bed.write(
+                    '\t'.join(
+                        [
+                            str(i) for i in [
+                                chrom,
+                                min(temp_positions),
+                                max(temp_positions) - 1,
+                                'tmp',
+                                1,
+                                strand,
+                                head_seq,
+                                temp_seq,
+                                tail_seq,
+                                read_length
+                            ]
+                        ]
+                    ) + '\n'
+                )
             
             ENDPOINT[strand][chrom][ENDPOINT_end] = ENDPOINT[strand][chrom].get(ENDPOINT_end,0) + float(1)
             if args.SIZE_CLASSES:
@@ -549,7 +641,12 @@ def assign_multimapper(
                         if chroms_list[i] not in genome:
                             print('WARNING: chromosome {} not found'.format(chroms_list[i]))
                             continue
-                        if genome[chroms_list[i]][p-1] == n:
+                        if strand_list[i] == '-':
+                            nuc = fu.IUPACcomp[n]
+                        else:
+                            nuc = n
+                        
+                        if genome[chroms_list[i]][p-1] == nuc:
                             # Softclipped nucleotide matches the genome
                             if p - 1 in mappos_list[i] or p + 1 in mappos_list[i]:
                                 mappos_list[i].add(p)
@@ -576,18 +673,18 @@ def assign_multimapper(
                         sc_left = all([k < min(mappos_list[i]) for k in untemp_nucs.keys()])
                         if args.SOFTCLIP_TYPE == '5p':
                             # Look for 3p softclipping and discard
-                            if strand == '+' and sc_right:
+                            if strand_list[i] == '+' and sc_right:
                                 proportions[i] = 0
                                 continue
-                            elif strand == '-' and sc_left:
+                            elif strand_list[i] == '-' and sc_left:
                                 proportions[i] = 0
                                 continue
                         elif args.SOFTCLIP_TYPE == '3p':
                             # Look for 5p softclipping and discard
-                            if strand == '+' and sc_left:
+                            if strand_list[i] == '+' and sc_left:
                                 proportions[i] = 0
                                 continue
-                            elif strand == '-' and sc_right:
+                            elif strand_list[i] == '-' and sc_right:
                                 proportions[i] = 0
                                 continue
                         
@@ -606,6 +703,78 @@ def assign_multimapper(
     for i in range(len(all_mappings)):
         if proportions[i] == 0:
             continue
+        
+        if args.WRITE_BED:
+            # Write a line to a temp BED file
+            temp_seq = ''
+            temp_positions = sorted(list(mappos_list[i]))
+            for p in range(len(temp_positions)):
+                if strand_list[i] == '+':
+                    nuc_to_add = genome[chroms_list[i]][temp_positions[p] - 1]
+                elif strand_list[i] == '-':
+                    nuc_to_add = fu.IUPACcomp[genome[chroms_list[i]][temp_positions[p] - 1]]
+                if p > 0:
+                    if temp_positions[p] > 1 + temp_positions[p-1]:
+                        # non-adjacent nucleotides are separated by a dot
+                        temp_seq += '.'
+                temp_seq += nuc_to_add
+            
+            left_seq = ''
+            right_seq = ''
+            if args.UNTEMP_OUT and i in untemp_dict:
+                left_nucs = dict([(p,n) for p,n in untemp_dict[i].items() if p < min(temp_positions)])
+                right_nucs = dict([(p,n) for p,n in untemp_dict[i].items() if p > max(temp_positions)])
+                if left_nucs:
+                    left_positions = sorted(list(left_nucs.keys()))
+                    for p in range(len(left_positions)):
+                        nuc_to_add = left_nucs[left_positions[p]]
+                        if p > 0:
+                            if left_positions[p] > 1 + left_positions[p-1]:
+                                # non-adjacent nucleotides are separated by a dot
+                                left_seq += '.'
+                        left_seq += nuc_to_add
+                if right_nucs:
+                    right_positions = sorted(list(right_nucs.keys()))
+                    for p in range(len(right_positions)):
+                        nuc_to_add = right_nucs[right_positions[p]]
+                        if p > 0:
+                            if right_positions[p] > 1 + right_positions[p-1]:
+                                # non-adjacent nucleotides are separated by a dot
+                                right_seq += '.'
+                        right_seq += nuc_to_add
+                    
+            if strand_list[i] == '+':
+                head_seq = left_seq
+                tail_seq = right_seq
+            elif strand_list[i] == '-':
+                # Reverse the templated string
+                head_seq = right_seq[::-1]
+                temp_seq = temp_seq[::-1]
+                tail_seq = left_seq[::-1]
+            
+            full_read = head_seq + temp_seq + tail_seq
+            read_length = len(''.join(full_read.split('.')))
+            
+            # chrom	start	end	unique_name	read_num	strand	head [untemp 5']	templated sequence	tail  [untemp 3']
+            temp_bed.write(
+                '\t'.join(
+                    [
+                        str(j) for j in [
+                            chroms_list[i],
+                            min(temp_positions),
+                            max(temp_positions) - 1,
+                            'tmp',
+                            float(value)*proportions[i],
+                            strand_list[i],
+                            head_seq,
+                            temp_seq,
+                            tail_seq,
+                            read_length
+                        ]
+                    ]
+                ) + '\n'
+            )
+        
         ENDPOINT[strand_list[i]][chroms_list[i]][ENDPOINT_end] = \
             ENDPOINT[strand_list[i]][chroms_list[i]].get(ENDPOINT_end,0) + \
             float(value)*proportions[i]
@@ -975,6 +1144,9 @@ def read_samfile(filename,filetype=args.READTYPE):
 # CALCULATE UNIQUE COVERAGE # 
 #############################
 
+if args.WRITE_BED:
+    temp_bed = open('{}.{}.temp.bed'.format(args.SAMPLENAME, args.READTYPE,), 'w')
+
 for samfile in args.SAMFILES:
     print('Reading {}...'.format(samfile))
     read_samfile(samfile,args.READTYPE)
@@ -1081,7 +1253,8 @@ print(
     )
 )
 
-print("All reads assigned. Writing BEDGRAPH files...")
+print("All reads assigned. Writing files...")
+
 for strand in ['+','-']:
     print('\t{} {}'.format(args.READTYPE,strand))
     if strand == '+':
