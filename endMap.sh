@@ -120,13 +120,18 @@ star_params_allreads="--runMode alignReads \
 echo "### PHASE 1: STAGE-SPECIFIC FASTQ FILE ASSEMBLY AND ADAPTER TRIMMING ###"
 
 # Gunzip any gzipped FASTQ files and move the files to the temp directory
-fastq_file=$(find $sample_dir -name "$SAMPLE_NAME.*f*q*") 
+fastq_file=($(find $sample_dir -name "$SAMPLE_NAME.*f*q*"))
 
-if [[ $fastq_file = *.gz ]]
-then
-    echo "Unzipping fastq file $fastq_file to the sample temp directory"
-    gunzip -c $fastq_file > $sample_dir/"$SAMPLE_NAME".fastq
-fi
+gz_found="false"
+for ff in ${fastq_file[@]}
+do
+    if [[ $ff = *.gz ]]
+    then
+        echo "Unzipping fastq file $ff to the sample temp directory"
+        gz_found="true"
+        gunzip -c $ff > $sample_dir/"$SAMPLE_NAME".fastq
+    fi
+done
 
 echo "Trimming transposase adapters with cutadapt"
 
@@ -204,7 +209,7 @@ mkdir -p $sample_dir/star
 echo "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
 eval "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
 
-if [[ $fastq_file = *.gz ]]
+if [[ $gz_found == "true" ]]
 then
    rm "$SAMPLE_NAME".fastq
 fi
