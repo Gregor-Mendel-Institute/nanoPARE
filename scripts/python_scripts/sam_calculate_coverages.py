@@ -457,15 +457,15 @@ def populate_bedgraphs(read_object):
                         [
                             str(i) for i in [
                                 chrom,
-                                min(temp_positions),
-                                max(temp_positions) - 1,
+                                min(temp_positions) - 1,
+                                max(temp_positions),
                                 'tmp',
                                 1,
                                 strand,
                                 head_seq,
                                 temp_seq,
                                 tail_seq,
-                                read_length
+                                len(read_object.seq1)
                             ]
                         ]
                     ) + '\n'
@@ -552,22 +552,18 @@ def assign_multimapper(
             return (read_object,value)
 
     # Assign fractional reads
-    # TODO: Assign fractional untemplated reads
     total_coverage = float(sum(existing_reads))
     proportions = [float(i)/total_coverage for i in existing_reads]
     untemp_dict = {}
     
     for i in range(len(all_mappings)):
-        if strand_list[i] == '+':
-            ENDPOINT_end = min(mappos_list[i]) - 1
-        elif strand_list[i] == '-':
-            ENDPOINT_end = max(mappos_list[i]) - 1
-        
         if args.READTYPE == 'TES':
             if strand_list[i] == '+':
-                strand_list[i] = '-'
+                current_strand = '-'
             else:
-                strand_list[i] = '+'
+                current_strand = '+'
+        else:
+            current_strand = strand_list[i]
         
         if args.UNTEMP_OUT:
             # If untemplated nucleotides are examined...
@@ -581,7 +577,7 @@ def assign_multimapper(
                 untemp_positions = set()
                 pos,cigar,mate = poslist_list[i][m]
                 softclip_positions = None
-                if strand_list[i] == '+':
+                if current_strand == '+':
                     if mate == 1:
                         softclip_positions = get_untemp_positions(
                             pos,
@@ -603,7 +599,7 @@ def assign_multimapper(
                     else:
                         print("ERROR: mate pair incorrectly specified.")
                         sys.exit(1)
-                elif strand_list[i] == '-':
+                elif current_strand == '-':
                     if mate == 1:
                         softclip_positions = get_untemp_positions(
                             pos,
@@ -641,7 +637,7 @@ def assign_multimapper(
                         if chroms_list[i] not in genome:
                             print('WARNING: chromosome {} not found'.format(chroms_list[i]))
                             continue
-                        if strand_list[i] == '-':
+                        if current_strand == '-':
                             nuc = fu.IUPACcomp[n]
                         else:
                             nuc = n
@@ -673,18 +669,18 @@ def assign_multimapper(
                         sc_left = all([k < min(mappos_list[i]) for k in untemp_nucs.keys()])
                         if args.SOFTCLIP_TYPE == '5p':
                             # Look for 3p softclipping and discard
-                            if strand_list[i] == '+' and sc_right:
+                            if current_strand == '+' and sc_right:
                                 proportions[i] = 0
                                 continue
-                            elif strand_list[i] == '-' and sc_left:
+                            elif current_strand == '-' and sc_left:
                                 proportions[i] = 0
                                 continue
                         elif args.SOFTCLIP_TYPE == '3p':
                             # Look for 5p softclipping and discard
-                            if strand_list[i] == '+' and sc_left:
+                            if current_strand == '+' and sc_left:
                                 proportions[i] = 0
                                 continue
-                            elif strand_list[i] == '-' and sc_right:
+                            elif current_strand == '-' and sc_right:
                                 proportions[i] = 0
                                 continue
                         
@@ -703,6 +699,17 @@ def assign_multimapper(
     for i in range(len(all_mappings)):
         if proportions[i] == 0:
             continue
+        
+        if strand_list[i] == '+':
+            ENDPOINT_end = min(mappos_list[i]) - 1
+        elif strand_list[i] == '-':
+            ENDPOINT_end = max(mappos_list[i]) - 1
+        
+        if args.READTYPE == 'TES':
+            if strand_list[i] == '+':
+                strand_list[i] = '-'
+            else:
+                strand_list[i] = '+'
         
         if args.WRITE_BED:
             # Write a line to a temp BED file
@@ -761,15 +768,15 @@ def assign_multimapper(
                     [
                         str(j) for j in [
                             chroms_list[i],
-                            min(temp_positions),
-                            max(temp_positions) - 1,
+                            min(temp_positions) - 1,
+                            max(temp_positions),
                             'tmp',
                             float(value)*proportions[i],
                             strand_list[i],
                             head_seq,
                             temp_seq,
                             tail_seq,
-                            read_length
+                            len(read_object.seq1)
                         ]
                     ]
                 ) + '\n'
