@@ -219,6 +219,7 @@ echo "Splitting capped and noncapped features..."
 python $python_dir/bed_uug_filter.py \
     -C $SAMPLE_NAME.capped.bed \
     -U $SAMPLE_NAME.noncapped.bed \
+    --min_uug 0.1 \
     $SAMPLE_NAME.all_features.bed \
     $SAMPLE_NAME.plus.bedgraph \
     $SAMPLE_NAME.minus.bedgraph \

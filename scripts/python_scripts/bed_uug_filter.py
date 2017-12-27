@@ -49,6 +49,12 @@ parser.add_argument(
     help='minumum number of reads in a feature to keep it',
     default=5
 )
+parser.add_argument(
+    '--min_uug', dest='min_uug', type=float,
+    help='minumum %uuG to consider capped',
+    default=None
+)
+
 
 args = parser.parse_args()
 
@@ -296,7 +302,11 @@ else:
     print("# WARNING: More than 1 local minimum")
     cutoff = float(sum(minima)/len(minima))/100
 
-print("# Cutoff: {}".format(cutoff))
+print("# Local minimum: {}".format(cutoff))
+if args.min_uug:
+    cutoff = args.min_uug
+    print("# Cutoff: {}".format(cutoff))
+
 print("# uuG distribution:")
 for a,b in zip(range(0,10**2 + 1),uug_dist):
     print('{}\t{}'.format(a,b))
