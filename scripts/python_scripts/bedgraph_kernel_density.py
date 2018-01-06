@@ -4,8 +4,10 @@ TODO: add module docstring
 """
 import logging
 import argparse
+import time
 from argparse import RawTextHelpFormatter
 from collections import OrderedDict
+import multiprocessing as mp
 from multiprocessing import Pool
 import numpy as np
 
@@ -50,7 +52,7 @@ def parse_args():
                         help='Type of the kernel function.', type=str,
                         default='laplace', choices=['gaussian', 'laplace'])
     parser.add_argument('-H', '--bandwidth', dest='bandwidth', metavar='int',
-                        type=int, help='Bandwith of the kernel', default=50)
+                        type=int, help='Bandwith of the kernel', default=15)
     parser.add_argument('-S', '--sigma', dest='sigma', metavar='integer',
                         type=int, help='sigma value', choices=range(1, 7),
                         default=3)
@@ -59,9 +61,11 @@ def parse_args():
                         default=3)
     parser.add_argument('-P', '--positive', dest='positive', default=False,
                         action='store_true', help='Write only positive values')
+    parser.add_argument('--single_stream', dest='single_stream', default=False,
+                        action='store_true', help='(for very large files) process bedgraph data as a single stream')
     parser.add_argument('-c', '--cores', dest='cores', metavar='int',
                         type=int, help='Number of CPU cores to use.',
-                        required=True)
+                        default=1)
 
     return parser.parse_args()  # parse everything
 
@@ -86,6 +90,16 @@ def check_positive(value):
         raise argparse.ArgumentTypeError('%s is an invalid positive int value',
                                          value)
     return i
+
+
+def mp_writer_dict(dest_dict,shared_queue,stop_token):
+    """Initializes a writer to output the mp queue."""
+    while True:
+        line = shared_queue.get()
+        if line == stop_token:
+            return
+        tkey, tval = line
+        dest_dict[tkey] = tval
 
 
 def read_file(f):
@@ -246,6 +260,7 @@ def init_chromosomes(chroms):
     for chrom, chromlen in chroms.items():
         logging.info('Initializing chromosome %s with %s.', chrom, chromlen)
         d_cov[chrom] = np.zeros(chromlen)
+    
     return d_cov
 
 
@@ -282,6 +297,7 @@ def get_bedgraph_coverage(chroms, file_name):
             continue
         # put data after succcessfull sanity checks
         cov[chrom][start:stop] = value
+    
     return cov
 
 
@@ -309,7 +325,7 @@ def get_pool_args(d, k, pos):
     return l
 
 
-def do_convolution(data):
+def do_convolution(data, parallel=False, queue=None):
     """
     Function that performs a convoution of kernel k on coverage data from a
     specific chromosome. This function is designed to run with multiprocessing
@@ -325,6 +341,8 @@ def do_convolution(data):
         'above_zero' the array contains only values above 0 or all values.
     """
     chrom, cov, k, only_positive = data
+    k_midpoint = int((len(k)-1)/2)
+    position_offsets = [i - k_midpoint for i in range(len(k))]
     # logging.info('Fitting kernel to chromosome %s:', chrom)
     print ('Fitting kernel to chromosome %s.' % chrom)
     # Do a convolution with a kernel along the coverage to smoothen it
@@ -332,7 +350,11 @@ def do_convolution(data):
     if only_positive:
         neg_values = np.where(cov_smoothed < 0)
         cov_smoothed[neg_values] = 0
-    return chrom, cov_smoothed
+    
+    if parallel:
+        queue.put([chrom,cov_smoothed])
+    else:
+        return chrom, cov_smoothed
 
 
 def get_changes(cov, same_values, compare_zero):
@@ -389,6 +411,132 @@ def coverage_to_bedgraph(data):
     return bedgraph
 
 
+def single_stream_process(input_file,output_file,chromosomes,kernel,digits=2,only_positive=True):
+    """
+    Perform all operations for kernel density estimation on a 
+    single bedgraph file as it is being read. Minimizes RAM requirements
+    for processing very large files
+    """
+    def is_not_zero(value,only_positive=False):
+        """ Returns whether a value is greater than zero, non-zero, or zero """
+        if only_positive:
+            return value > 0
+        else:
+            return value != 0
+    
+    
+    def dump_chunk(chunk,chrom,startpos,output,only_positive):
+        """ Writes all elements of the chunk """
+        start = startpos
+        prevpos = 0
+        prevcount = None
+        position = None
+        
+        for current_value in chunk:
+            if position is None:
+                position = start
+            else:
+                position += 1
+            
+            if position < 0:
+                continue
+            
+            count = round(current_value,digits)
+            if count != prevcount or int(position) > 1 + prevpos:
+                # The newly encountered value is not a continuation
+                # of the previous value. Write the old run and start another.
+                if prevcount and is_not_zero(prevcount,only_positive):
+                    line_to_write = '\t'.join(
+                        [
+                            str(i) for i in [
+                                chrom,
+                                start,
+                                prevpos + 1,
+                                prevcount
+                            ]
+                        ]
+                    ) + '\n'
+                    output.write(line_to_write)
+                        
+                start = position
+            prevcount = count
+            prevpos = position
+        
+        if position and prevcount and is_not_zero(prevcount,only_positive):
+            line_to_write = '\t'.join(
+                [
+                    str(i) for i in [
+                        chrom,
+                        start,
+                        prevpos + 1,
+                        prevcount
+                    ]
+                ]
+            ) + '\n'
+            output.write(line_to_write)
+    
+    
+    input = open(input_file)
+    output = open(output_file,'w')
+    # Get kernel size and relative positions
+    klen = len(kernel)
+    k_midpoint = int((klen-1)/2)
+    position_offset = -k_midpoint
+    current_chrom = None
+    # Initialize a dict that will temporarily store positions within the zone of effect of the kernel
+    current_chunk = []
+    chunk_start = 0
+    for l in input:
+        # Perform all calculations on a local chunk
+        chrom, start, stop, value = l.rstrip().split('\t')
+        # dont try to put data into non initialized chromosomes
+        if not current_chrom:
+            current_chrom = chrom
+            print ('Fitting kernel to chromosome %s.' % chrom)
+        
+        if chrom != current_chrom:
+            print ('Fitting kernel to chromosome %s.' % chrom)
+            dump_chunk(current_chunk, current_chrom, chunk_start, output, only_positive)
+            current_chunk = []
+            chunk_start = 0
+            current_chrom = chrom
+        
+        start = int(start)
+        stop = int(stop)
+        value = float(value)
+        if value == 0:
+            continue
+        
+        # Perform kernel convolution with the current line
+        for pos in range(start,stop):
+            kval = [i*value for i in kernel]
+            kpos = pos + position_offset
+            if kpos < chunk_start:
+                # Expand the left edge of chunk to accommodate the kernel
+                current_chunk = [0]*(chunk_start - kpos) + current_chunk
+                chunk_start = kpos
+            kernel_endpos = pos - position_offset
+            chunk_endpos = chunk_start + len(current_chunk)
+            if kernel_endpos > chunk_endpos:
+                if kpos > chunk_endpos:
+                    # Dump the chunk and start a new one
+                    dump_chunk(current_chunk, current_chrom, chunk_start, output, only_positive)
+                    current_chunk = [0]*klen
+                    chunk_start = kpos
+                    chunk_endpos = chunk_start + klen
+                else:
+                    # Expand the right edge of chunk to accommodate the kernel
+                    current_chunk = current_chunk + [0]*(kernel_endpos - chunk_endpos)
+            # Add the kernel to current_chunk
+            for pos_to_add,val_to_add in zip(range(kpos - chunk_start,kernel_endpos - chunk_start),kval):
+                current_chunk[pos_to_add] += val_to_add
+    
+    input.close()
+    dump_chunk(current_chunk, current_chrom, chunk_start, output, only_positive)
+    output.close()
+
+
+
 def main():
     """
     TODO: Add docstring.
@@ -404,6 +552,8 @@ def main():
     digits = args.digits
     only_positive = args.positive
     nprocs = args.cores
+    single_stream = args.single_stream
+    parallel = nprocs > 1
     # calculate the kernel so that it can be convolved over the data
     kernel = None
     if kernel_type == 'laplace':
@@ -412,28 +562,40 @@ def main():
         kernel = get_gaussian_kernel(bandwidth, sigma)
     # read in the length of the chromosomes
     chromosomes = parse_chromosomes(lengths)
-    # read in the begraph data so that it later can be smoothed
-    coverage = get_bedgraph_coverage(chromosomes, bedgraph_in)
-    # restructure some objects in a list of tuples that can be used easily
-    # with multiprocessing
-    convolution_args = get_pool_args(coverage, kernel, only_positive)
-    # Do the convolution with the selected kernel to get a smoothed coverage
-    results = []
-    for data in convolution_args:
-        results.append(do_convolution(data))
-    # reshape the smoothed coverage into a tuple that can be used to construct
-    # a bedgraph
-    # IDEA: switch from digit rounding before comparison to only printing the
-    # respective numbers
-    data_out = [r + (digits,) for r in results]
-    # convert the smoothed coverage data to a bedgraph like format
-    # via multiprocees and write to output file.
-    p = Pool(nprocs)
-    with open(bedgraph_out, 'w') as f:
-        for results in p.imap(coverage_to_bedgraph, data_out):
-            for name, start, stop, value in results:
-                fmt_str = '%s\t%d\t%d\t%%.%sf\n' % (name, start, stop, digits)
-                f.write(fmt_str % value)
+    if single_stream:
+        # Process bedgraph data as single input/output streams
+        single_stream_process(
+            bedgraph_in,
+            bedgraph_out,
+            chromosomes,
+            kernel,
+            digits,
+            only_positive
+        )
+    else:
+        # read in the begraph data so that it later can be smoothed
+        coverage = get_bedgraph_coverage(chromosomes, bedgraph_in)
+        # restructure some objects in a list of tuples that can be used easily
+        # with multiprocessing
+        convolution_args = get_pool_args(coverage, kernel, only_positive)
+        # Do the convolution with the selected kernel to get a smoothed coverage
+        results = []
+        for data in convolution_args:
+            results.append(do_convolution(data))
+        # reshape the smoothed coverage into a tuple that can be used to construct
+        # a bedgraph
+        # IDEA: switch from digit rounding before comparison to only printing the
+        # respective numbers
+        data_out = [r + (digits,) for r in results]
+        # convert the smoothed coverage data to a bedgraph like format
+        # via multiprocees and write to output file.
+        p = Pool(nprocs)
+        with open(bedgraph_out, 'w') as f:
+            for results in p.imap(coverage_to_bedgraph, data_out):
+                for name, start, stop, value in results:
+                    fmt_str = '%s\t%d\t%d\t%%.%sf\n' % (name, start, stop, digits)
+                    f.write(fmt_str % value)
+
 
 # run everything
 if __name__ == '__main__':

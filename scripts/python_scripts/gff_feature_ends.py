@@ -1,6 +1,6 @@
 
 '''
-Commandline arguments: -I=[input file] -O=[output file] -E=[end type] -D=[distance] -F=[feature type]
+Commandline arguments: -I=[input file] -O=[output file] -E=[end type] -D=[distance] -F=[feature type] -T=[training transcripts]
 Defaults:
     -I NONE (required)
     -O NONE (required)
@@ -12,7 +12,8 @@ import re,sys
 
 ENDTYPE  = 'TSS'
 DISTANCE = 1000
-FEATURE  = 'gene'
+FEATURE  = 'mRNA'
+TRAINING = 'none'
 
 args = sys.argv[1:]
 for arg in args:
@@ -30,13 +31,29 @@ for arg in args:
         DISTANCE=int(value)
     elif option == '-F':
         FEATURE=value
+    elif option == '-T':
+        TRAINING=value
     
 GFF=open(GFF_IN)
 GFFout=open(GFF_OUT,'w')
+if TRAINING != 'none':
+    use_all_genes=False
+    training_data=set([l.rstrip() for l in open(TRAINING)])
+else:
+    use_all_genes=True
 for line in GFF:
+    if line[0] == '#':
+        continue
     l=line.rstrip().split('\t')
     if l[2] != FEATURE:
         continue
+    if not use_all_genes:
+        try:
+            ID = re.search('ID=([^;$]+);?.+$',l[8]).groups()[0]
+        except:
+            continue
+        if ID not in training_data:
+            continue
     start  = int(l[3])
     end    = int(l[4])
     strand = l[6]

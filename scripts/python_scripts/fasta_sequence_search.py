@@ -7,36 +7,30 @@ import re
 import os
 import time
 import argparse
+import fasta_utils as fu
 import multiprocessing as mp
 
-"""
-Commandline arguments: [1] genome_FASTA [2] match_file [3] out_folder
-genome_FASTA - Full path of the FASTA file to search
-match_file   - Full path of a space-delimited file with information on searches to perform.
-    Each line must contain the following information:
-        BED.filename: Path to a BED file that will be written containing all hits
-        search.sequence(s): DNA sequence regex pattern that follows IUPAC nucleotide naming conventions.
-            Separate multiple search sequences with a comma
-        mismatches: Number of mismatches allowed in a matching sequence
-            Separate multiple search sequences with a comma
-"""
+########################
+### ARGUMENT PARSING ###
+########################
 
-genome_FASTA = sys.argv[1]
-match_file   = sys.argv[2]
+parser = argparse.ArgumentParser()
+parser.add_argument(dest='genome_FASTA',
+                    help="Path to a FASTA file.")
+parser.add_argument(dest='match_file',
+                    help="Path to a table of values to search for (see description).")
+parser.add_argument('-O', '--out_folder', type=str, default='./',
+                    help="Folder to output resulting BED files.")
+parser.add_argument('--parallel', action='store_true',
+                    help="Multiprocessing of each element in genome_FASTA")
+parser.add_argument("--sort_results", action='store_true',
+                    help="Whether to sort results prior to writing.")
 
-parallel = False
-sort_results = False
+args = parser.parse_args()
 
-try:
-    out_folder = sys.argv[3]
-except:
-    out_folder = './'
-
+out_folder = args.out_folder
 if out_folder[-1] != '/':
     out_folder+='/'
-
-genome={}
-chromosomes={}
 
 def flatten(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
@@ -118,7 +112,7 @@ def IUPAC_matches(sequence,dist,chrom,queue,parallel):
     hit_number = 0
     # sort_results stores all hits before sorting/filtering.
     # NOT recommended for patterns with many hits
-    if sort_results:
+    if args.sort_results:
         hits_sense = list(set(flatten(
             [
                 [
@@ -264,26 +258,15 @@ for k,v,c,n in zip(keys,values,complements,notkeys):
 # LOADING DATA FROM INPUT FILES #
 #################################
 
-chrom = 'none'
-split_on = ' '
-genome_file = open(genome_FASTA)
-for line in genome_file:
-    line = line.rstrip()
-    if line[0] == '>':
-        if chrom != 'none':
-            genome[chrom] = ''.join(x)
-        chrom = line[1:].split(split_on)[0]
-        x = []
-        continue
-    x.append(line)
-genome[chrom] = ''.join(x)
+genome = fu.import_genome(args.genome_FASTA,keep_case=False)
+chromosomes = {}
 
 for k,v in genome.items():
     chromosomes[k] = len(v)
 
 linecounter = 0
 if __name__ == '__main__':
-    for line in open(match_file):
+    for line in open(args.match_file):
         linecounter += 1
         if line[0] == '#':
             continue
@@ -292,7 +275,7 @@ if __name__ == '__main__':
         except:
             print('Wrong number of columns in line '+str(linecounter))
             continue
-        if parallel:
+        if args.parallel:
             queue = mp.Queue()
             STOP_TOKEN = "FINISHED"
             writer_process = mp.Process(

@@ -8,6 +8,7 @@ genome_FASTA - Full path of the FASTA file to search
 '''
 
 genome_FASTA = sys.argv[1]
+split_on=' '
 
 chrom='none'
 genome={}
@@ -18,7 +19,7 @@ for line in genome_file:
     if line[0]=='>':
         if chrom!='none':
             genome[chrom]=''.join(x)
-        chrom=line[1:len(line)]
+        chrom=line[1:len(line)].split(split_on)[0]
         x=[]
         continue
     x.append(line)

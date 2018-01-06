@@ -174,7 +174,7 @@ def flatten(list_of_lists):
     return [item for sublist in list_of_lists for item in sublist]
 
 
-def import_genome(genome_FASTA, split_on=' '):
+def import_genome(genome_FASTA, split_on=' ', keep_case=True):
     """Reads FASTA file to a dict."""
     genome = {}
     chrom = 'none'
@@ -189,6 +189,9 @@ def import_genome(genome_FASTA, split_on=' '):
             chrom = line[1:].split(split_on)[0]
             current_lines = []
             continue
+        
+        if not keep_case:
+            line = line.upper()
         current_lines.append(line)
     genome[chrom] = ''.join(current_lines)
     return genome

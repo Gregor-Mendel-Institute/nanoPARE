@@ -147,7 +147,7 @@ for feature in sorted(bed_features.keys()):
         if bed_features[feature]['strand'] == '-':
             nucleotides = [i for i in fu.rc(''.join(nucleotides))]
         
-        G = round(float(sum([i=='G' for i in x])) / len(x),3)
+        G = round(float(sum([i=='G' for i in nucleotides])) / len(nucleotides),3)
         g_file.write('{}\t{}\n'.format(
             feature,
             G

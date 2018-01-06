@@ -101,25 +101,23 @@ def writer(merge_filename,shared_queue,stop_token):
         dest_file.write(line)
 
 def find_bed_features(chrom,chromlen,queue):
-    edges  = [
-        int(thresh_coverage[chrom][0])
-    ] + [
-        i - j
-        for i,j in zip(
-            thresh_coverage[chrom][1:],
-            thresh_coverage[chrom][:chromlen]
-        )
-    ]
+    above_thresh = sorted(list(thresh_coverage[chrom]))
+    if len(above_thresh) < 2:
+        return
+    
+    # Identify discontinuous regions in the positions above the threshold
+    splits = [(a,b) for a,b in zip(above_thresh[:-1],above_thresh[1:]) if b - a > 1]
+    
+    # Pair start and end locations for each region
+    region_endpoints = zip([above_thresh[0]] + [b for a,b in splits],[a for a,b in splits] + [above_thresh[-1]])
+    
     featurecount = 0
-    starts = which(edges, 1)
-    ends = which(edges, -1)
-    if len(starts) > len(ends):
-        ends += [chromlen]
-    for chromStart,chromEnd in zip(starts,ends):
+    # Iterate through regions, writing a BED entry if large enough
+    for chromStart,chromEnd in region_endpoints:
         if chromEnd - chromStart >= args.minimum:
             featurecount += 1
             name = '.'.join(['thresh',chrom,str(featurecount)])
-            coverage_subset = coverage[chrom][chromStart:chromEnd+1]
+            coverage_subset = [coverage[chrom].get(i,0) for i in range(chromStart,chromEnd+1)]
             if args.value == 'sum':
                 signalValue = sum(coverage_subset)
             elif args.value == 'mean':
@@ -128,6 +126,9 @@ def find_bed_features(chrom,chromlen,queue):
                 signalValue = max(coverage_subset)
             
             peak_positions = find_peaks(coverage_subset)
+            if len(peak_positions) == 0:
+                print('WARNING: no peaks found in {}:{}-{}; skipping.'.format(chrom,chromStart,chromEnd))
+                continue
             peak_heights = [coverage_subset[i] for i in peak_positions]
             ordered_peaks = [
                 peak_positions[i]
@@ -156,7 +157,7 @@ def find_bed_features(chrom,chromlen,queue):
                             chromStart,
                             chromEnd,
                             name,
-                            signalValue,
+                            round(signalValue,2),
                             args.strand,
                             peak,
                             ','.join(other_peaks)
@@ -182,8 +183,8 @@ for line in lengths_file:
 coverage={}
 thresh_coverage={}
 for chrom,chromlen in chromosomes.items():
-    coverage[chrom] = [0]*chromlen
-    thresh_coverage[chrom] = [False]*chromlen
+    coverage[chrom] = {}
+    thresh_coverage[chrom] = set()
 
 coverage_file = open(args.bedgraph_in)
 for line in coverage_file:
@@ -191,8 +192,8 @@ for line in coverage_file:
     count = float(count)
     for i in range(int(start),int(end)):
         coverage[chrom][i] = count
-        thresh_coverage[chrom][i] = count > args.threshold
-
+        if count > args.threshold:
+            thresh_coverage[chrom].add(i)
 
 # Begins identifying continuous features, outputting a BED file.
 # Example line:

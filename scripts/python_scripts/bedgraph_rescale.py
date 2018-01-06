@@ -26,6 +26,10 @@ parser.add_argument(
     help='input annotation GFF/GTF filepath', required=True
 )
 parser.add_argument(
+    '--transcript_type', dest='transcript_type', default=None,
+    help="Only consider entries with the given 'transcript_type' attribute."
+)
+parser.add_argument(
     '-S', '--strand', dest='strand', type=str, 
     help='(+/-) which strand coverage data is on', required=True
 )
@@ -39,7 +43,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--minband', dest='minband', type=int,
-    help='minimum bandwidth', default=10
+    help='minimum bandwidth', default=15
 )
 parser.add_argument(
     '--position', dest='position', type=str,
@@ -120,6 +124,10 @@ end_meta_neg = [0]*metalength
 
 for ID in ref_IDs:
     # current_transcript = ref_transcripts[ID].data
+    if args.transcript_type:
+        if args.transcript_type != ref_transcripts[ID].attributes['transcript_type']:
+            continue
+    
     current_transcript = ref_transcripts[ID]
     chrom = current_transcript.chrom
     strand = current_transcript.strand

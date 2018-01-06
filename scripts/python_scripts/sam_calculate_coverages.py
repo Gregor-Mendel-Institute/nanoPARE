@@ -65,6 +65,16 @@ parser.add_argument(
     default='both', choices=['none','5p','3p','both']
 )
 parser.add_argument(
+    "--mmIO", dest='mmIO', type=str,
+    help="(out) write multimappers to disk. (in) import multimappers from current directory",
+    default=False, choices=['in','out','False']
+)
+parser.add_argument(
+    "--sj_out", dest='SJ_OUT', action='store_true',
+    help="If true, outputs splice junction table",
+    default=False
+)
+parser.add_argument(
     "--size_classes", dest='SIZE_CLASSES',
     help="(optional) outputs a table of read lengths per genome position 5' end",
     default=[], nargs='+'
@@ -113,6 +123,9 @@ while line[0] == '@':
         chromosomes[chrom] = chromlen
     
     line = file.readline()
+    if not line:
+        break
+    
 
 file.close()
 genome_size = sum(chromosomes.values())
@@ -124,6 +137,7 @@ COVERAGE = {}
 ENDPOINT = {}
 READLENGTHS = {}
 UNTEMP = {}
+SJ = {}
 
 COVERAGE['+'] = {}
 COVERAGE['-'] = {}
@@ -137,6 +151,10 @@ READLENGTHS['-'] = {}
 UNTEMP['+'] = {}
 UNTEMP['-'] = {}
 
+SJ['+'] = {}
+SJ['-'] = {}
+SJ['.'] = {}
+
 for chrom,length in chromosomes.items():
     COVERAGE['+'][chrom] = {}
     COVERAGE['-'][chrom] = {}
@@ -146,6 +164,9 @@ for chrom,length in chromosomes.items():
     READLENGTHS['-'][chrom] = {}
     UNTEMP['+'][chrom] = {}
     UNTEMP['-'][chrom] = {}
+    SJ['+'][chrom] = {}
+    SJ['-'][chrom] = {}
+    SJ['.'][chrom] = {}
 
 # One class is defined for this script:
 # RNASeqRead objects contain all information for a single read / read pair
@@ -179,7 +200,7 @@ class RNASeqRead():
         positions = list(self.primary.keys())
         if include_secondary:
             if self.secondary:
-                positions.append(list(self.secondary.keys()))
+                positions.extend(list(self.secondary.keys()))
         return min(positions)
         
     def mincigar(self,include_secondary=args.SECONDARY):
@@ -218,7 +239,28 @@ def writer(merge_filename,shared_queue,stop_token):
         dest_file.write(line)
 
 
-def populate_bedgraphs(read_object):
+def get_junction_strand(junction,chrom):
+    """ Returns '+', '-', or '.' for a left/right
+    pair of splice junction positions based
+    on the flanking genomic sequence """
+    left,right = junction
+    flanking_sequence = genome[chrom][left-1:left+1] + genome[chrom][right-2:right]
+    flanking_sequence = flanking_sequence.upper()
+    if flanking_sequence in ['GTAG','GCAG','ATAC']:
+        strand = '+'
+    elif flanking_sequence in ['CTAC','CTGC','GTAT']:
+        strand = '-'
+    elif flanking_sequence == 'GTAC':
+        strand = '.'
+    # elif flanking_sequence[:2] == 'GT' or flanking_sequence[-2:] == 'AG':
+        # strand = '+'
+    # elif flanking_sequence[:2] == 'CT' or flanking_sequence[-2:] == 'AC':
+        # strand = '-'
+    else:
+        strand = '.'
+    return strand
+    
+def populate_bedgraphs(read_object,mmIO=args.mmIO):
     """Adds values from read_object to the appropriate bedgraph dicts."""
     if len(read_object.primary)==0:
         return
@@ -226,6 +268,9 @@ def populate_bedgraphs(read_object):
     # If multimapper, store in MM and do not change bedgraph dicts
     nmap = len(read_object.map_locations())
     if nmap > 1:
+        if mmIO == "out":
+            return nmap
+        
         minpos = read_object.minpos()
         cigar = read_object.mincigar()
         seq = None
@@ -254,7 +299,13 @@ def populate_bedgraphs(read_object):
         chrom,strand,poslist = read_object.map_locations()[0]
         map_positions = set()
         for pos,cigar,mate in poslist:
-            mate_positions = get_mapping_positions(pos,cigar)
+            mate_positions,junctions = get_mapping_positions(pos,cigar)
+            if junctions:
+                # TODO: Add to a splice junction dictionary
+                for j in junctions:
+                    jstrand = get_junction_strand(j,chrom)
+                    SJ[jstrand][chrom][j] = SJ[jstrand][chrom].get(j,0) + 1
+            
             untemp_nucs = {}
             if args.UNTEMP_OUT:
                 # If untemplated nucleotides are examined...
@@ -394,11 +445,6 @@ def populate_bedgraphs(read_object):
             elif strand == '-':
                 ENDPOINT_end = max(map_positions) - 1
             
-            if args.READTYPE == 'TES':
-                if strand == '+':
-                    strand = '-'
-                else:
-                    strand = '+'
             
             if args.WRITE_BED:
                 # Generate a line for a temp BED file
@@ -479,6 +525,9 @@ def populate_bedgraphs(read_object):
                 READLENGTHS[strand][chrom][ENDPOINT_end][n] = READLENGTHS[strand][chrom][ENDPOINT_end].get(n,0) + float(1)
             for pos in map_positions:
                 COVERAGE[strand][chrom][pos-1] = COVERAGE[strand][chrom].get(pos-1,0) + float(1)
+        if mmIO == "out":
+            return 0
+
 
 def assign_multimapper(
     read_object,
@@ -497,19 +546,21 @@ def assign_multimapper(
     # Get dictionary of all mappings from the read_object
     all_mappings = read_object.map_locations()
     
-    mappos_list = [
-        set(
-            flatten(
-                [
-                    [
-                        i for i in list(get_mapping_positions(p,c))
-                        if i > 0 and i <= chromosomes[chrom]
-                    ] for p,c,m in poslist
-                ]
-            )
-        )
-        for chrom,strand,poslist in all_mappings
-    ]
+    mappos_list = []
+    junction_list = []
+    for chrom,strand,poslist in all_mappings:
+        allpositions = set()
+        alljunctions = []
+        for p,c,m in poslist:
+            positions, junctions = get_mapping_positions(p,c)
+            allpositions.update(positions)
+            for j in junctions:
+                if j not in alljunctions:
+                    alljunctions += [j]
+            
+        mappos_list += [allpositions]
+        junction_list += [alljunctions]
+    
     
     long_enough = [len(i) >= args.MINMATCH for i in mappos_list]
     all_mappings = [all_mappings[i] for i in which(long_enough)]
@@ -557,13 +608,8 @@ def assign_multimapper(
     untemp_dict = {}
     
     for i in range(len(all_mappings)):
-        if args.READTYPE == 'TES':
-            if strand_list[i] == '+':
-                current_strand = '-'
-            else:
-                current_strand = '+'
-        else:
-            current_strand = strand_list[i]
+
+        current_strand = strand_list[i]
         
         if args.UNTEMP_OUT:
             # If untemplated nucleotides are examined...
@@ -705,12 +751,6 @@ def assign_multimapper(
         elif strand_list[i] == '-':
             ENDPOINT_end = max(mappos_list[i]) - 1
         
-        if args.READTYPE == 'TES':
-            if strand_list[i] == '+':
-                strand_list[i] = '-'
-            else:
-                strand_list[i] = '+'
-        
         if args.WRITE_BED:
             # Write a line to a temp BED file
             temp_seq = ''
@@ -782,6 +822,14 @@ def assign_multimapper(
                 ) + '\n'
             )
         
+        junctions = junction_list[i]
+        if junctions:
+            # TODO: Add to a splice junction dictionary
+            for j in junctions:
+                jstrand = get_junction_strand(j,chroms_list[i])
+                SJ[jstrand][chrom][j] = SJ[jstrand][chrom].get(j,0) + \
+                    float(value)*proportions[i]
+        
         ENDPOINT[strand_list[i]][chroms_list[i]][ENDPOINT_end] = \
             ENDPOINT[strand_list[i]][chroms_list[i]].get(ENDPOINT_end,0) + \
             float(value)*proportions[i]
@@ -809,6 +857,68 @@ def assign_multimapper(
                 UNTEMP[strand_list[i]][chroms_list[i]][u_pos][n] = \
                     UNTEMP[strand_list[i]][chroms_list[i]][u_pos].get(n,0) + \
                     float(value)*proportions[i]
+
+
+def run_mm_assignment(multiplicity):
+    oscillator = False
+    reads_were_assigned = True
+    while reads_were_assigned:
+        reads_were_assigned = False
+        mm_readsort = sorted(
+            list(MM[multiplicity].keys()),
+            reverse=oscillator
+        )
+        keep = []
+        for pos in mm_readsort:
+            current_read = MM[multiplicity].get(pos,{})
+            if not current_read:
+                continue
+            failed_to_map = {}
+            for k in current_read.keys():
+                read_object,value = current_read[k]
+                unmapped = assign_multimapper(read_object,value,allow_naive=False)
+                if unmapped:
+                    failed_to_map[k] = unmapped
+            MM[multiplicity][pos] = failed_to_map
+            if failed_to_map:
+                keep.append(pos)
+            else:
+                del MM[multiplicity][pos]
+                reads_were_assigned = True
+        oscillator = not oscillator
+    
+    # Assign any remaining reads in the current multiplicity group naively
+    residuals = sum(
+        [
+            count for obj,count in flatten(
+                [a.values() for a in MM[multiplicity].values()]
+            )
+        ]
+    )
+    
+    if args.ALLOW_NAIVE:
+        mm_readsort = sorted(list(MM[multiplicity].keys()))
+        keep = []
+        for pos in mm_readsort:
+            current_read = MM[multiplicity].get(pos,{})
+            if not current_read:
+                continue
+            failed_to_map = {}
+            for k in current_read.keys():
+                read_object,value = current_read[k]
+                unmapped = assign_multimapper(read_object,value,allow_naive=True)
+                if unmapped:
+                    failed_to_map[k] = unmapped
+            MM[multiplicity][pos] = failed_to_map
+            if failed_to_map:
+                keep.append(pos)
+            else:
+                del MM[multiplicity][pos]
+                reads_were_assigned = True
+        
+        assert len(MM[multiplicity]) == 0, "ERROR: reads still remaining in {}:{}".format(args.READTYPE,multiplicity)
+        
+    return residuals
 
 
 def write_bedgraph_from_dict(input, output_filename, digits=2, parallel=False, multi_key=False):
@@ -951,6 +1061,7 @@ def get_mapping_positions(pos,cigar):
     S    Soft Clipping;  the clipped nucleotides are present in the read
     """
     positions = set()
+    junctions = []
     current_pos = pos
     positions.add(current_pos)
     cigar_elements = zip(re.findall('[A-Z]+',cigar),[int(i) for i in re.findall('\d+',cigar)])
@@ -969,12 +1080,22 @@ def get_mapping_positions(pos,cigar):
         if operator == 'M':
             positions.update(range(current_pos,current_pos+number))
             current_pos += number
-        elif operator in ['D','N']:
+        elif operator == 'N':
+            if args.SJ_OUT:
+                # TODO: Add donor and acceptor sites to read_object mapping
+                leftside = current_pos
+                current_pos += number
+                rightside = current_pos - 1
+                junctions += [(leftside,rightside)]
+            else:
+                current_pos += number
+        elif operator == 'D':
             current_pos += number
+        
         elif operator in ['I','H']:
             continue
     
-    return positions
+    return positions, junctions
     
 def get_untemp_positions(pos,cigar,seq,include_mismatch=False):
     """Converts the pos+CIGAR string to a dict of softclipped locations"""
@@ -1024,7 +1145,7 @@ def generate_read_from_sam(input_lines,readtype=args.READTYPE,keep_seq=False):
         assert ID == generated_read.ID, 'ERROR: nonmatching IDs in input_lines:\n{}\t{}'.format(generated_read.ID,ID)
         
         attributes = dict([(':'.join(i.split(':')[0:2]),i.split(':')[-1]) for i in l[11:]])
-        Nmap       = int(attributes['NH:i'])
+        Nmap = int(attributes['NH:i'])
         if generated_read.Nmap == 0:
             generated_read.Nmap = Nmap
         assert Nmap == generated_read.Nmap, 'ERROR: inconsistent Nmap score for {}'.format(ID)
@@ -1118,7 +1239,9 @@ def generate_read_from_sam(input_lines,readtype=args.READTYPE,keep_seq=False):
     
     return generated_read
 
-def read_samfile(filename,filetype=args.READTYPE):
+def read_samfile(filename, filetype=args.READTYPE, mmIO=args.mmIO):
+    if mmIO:
+        mmOut = {}
     infile = open(filename)
     current_ID    = None
     current_read  = None
@@ -1138,25 +1261,121 @@ def read_samfile(filename,filetype=args.READTYPE):
                 current_read = generate_read_from_sam(current_lines,filetype,keep_seq=True)
             else:
                 current_read = generate_read_from_sam(current_lines,filetype)
-            populate_bedgraphs(current_read)
+            residual = populate_bedgraphs(current_read)
+            if mmIO == "out" and residual > 0:
+                if residual not in mmOut:
+                    mmOut[residual] = open('./mmIO.{}.{}.sam'.format(filetype,residual),'w')
+                mmOut[residual].write(''.join(current_lines))
             current_lines = [line]
             current_ID = ID
     if args.UNTEMP_OUT:
         current_read = generate_read_from_sam(current_lines,filetype,keep_seq=True)
     else:
         current_read = generate_read_from_sam(current_lines,filetype)
-    populate_bedgraphs(current_read)
+    residual = populate_bedgraphs(current_read)
+    if mmIO == "out" and residual > 0:
+        if residual not in mmOut:
+            mmOut[residual] = open('./mmIO.{}.{}.sam'.format(filetype,residual),'w')
+        mmOut[residual].write(''.join(current_lines))
+        
+        for k in mmOut.keys():
+            mmOut[k].close()
 
 #############################
 # CALCULATE UNIQUE COVERAGE # 
 #############################
 
+if args.mmIO == "in":
+    # preload BEDGRAPH files of unique mappers
+    print('Loading existing read coverage...')
+    if args.SJ_OUT:
+        input_name = '{}_{}_SJ.mmIO.bed'.format(args.SAMPLENAME,args.READTYPE)
+        input_file = open(input_name)
+        for line in input_file:
+            chrom,start,end,name,count,strand = line.rstrip().split()
+            count = float(count)
+            i = (start,end)
+            SJ[strand][chrom][i] = SJ[strand][chrom].get(i,float(0)) + count
+        input_file.close()
+
+    for STRAND in ['plus','minus']:
+        if STRAND == 'plus':
+            s = '+'
+        elif STRAND == 'minus':
+            s = '-'
+        
+        input_name = '{}_{}_{}.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND)
+        print('\t{}'.format(input_name))
+        input_file = open(input_name)
+        for line in input_file:
+            chrom,start,end,count = line.rstrip().split()
+            count = float(count)
+            for i in range(int(start), int(end)):
+                ENDPOINT[s][chrom][i] = ENDPOINT[s][chrom].get(i,float(0)) + count
+        input_file.close()
+        
+        input_name = '{}_{}_{}_coverage.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND)
+        print('\t{}'.format(input_name))
+        input_file = open(input_name)
+        for line in input_file:
+            chrom,start,end,count = line.rstrip().split()
+            count = float(count)
+            for i in range(int(start), int(end)):
+                COVERAGE[s][chrom][i] = COVERAGE[s][chrom].get(i,float(0)) + count
+        input_file.close()
+        
+        if args.UNTEMP_OUT:
+            input_name = '{}_{}_{}_untemp.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND)
+            print('\t{}'.format(input_name))
+            input_file = open(input_name)
+            multikey = input_file.readline().rstrip().split('\t')[3:]
+            for line in input_file:
+                if line[0] == '#':
+                    continue
+                l = line.rstrip().split()
+                chrom = l[0]
+                start = int(l[1])
+                end = int(l[2])
+                countvals = [float(i) for i in l[3:]]
+                for pos in range(start, end):
+                    for i in range(len(multikey)):
+                        if countvals[i] > 0:
+                            if pos not in UNTEMP[s][chrom]:
+                                UNTEMP[s][chrom][pos] = {}
+                            UNTEMP[s][chrom][pos][multikey[i]] = UNTEMP[s][chrom][pos].get(multikey[i],0) + 1
+            
+            input_file.close()
+    
+    mmIO_files = [i for i in os.listdir('.') if i.startswith('mmIO.{}'.format(args.READTYPE))]
+    args.SAMFILES = [v for k,v in sorted([(int(k.split('.')[-2]),k) for k in mmIO_files])]
+    print('{} mmIO SAM files found.'.format(len(args.SAMFILES)))
+
+
 if args.WRITE_BED:
     temp_bed = open('{}.{}.temp.bed'.format(args.SAMPLENAME, args.READTYPE,), 'w')
 
 for samfile in args.SAMFILES:
-    print('Reading {}...'.format(samfile))
     read_samfile(samfile,args.READTYPE)
+    if args.mmIO == "in":
+        mmnums = dict(
+            [
+                (
+                    k,
+                    sum(
+                        [
+                            b[1] for b in flatten(
+                                [a.values() for a in v.values()]
+                            )
+                        ]
+                    )
+                ) for k,v in MM.items()
+            ]
+        )
+        mmreadnum = sum(mmnums.values())
+        multiplicity = int(samfile.split('.')[-2])
+        print('Assigning {} ({} reads)'.format(samfile,mmreadnum))
+        residuals = run_mm_assignment(multiplicity)
+        print('    {} residuals'.format(residuals))
 
 
 # Begin to populate BEDGRAPH dicts with non-unique reads using the algorithm
@@ -1173,7 +1392,6 @@ for samfile in args.SAMFILES:
 #    Repeat the oscillation process until no more weighted
 #    assignments can be made in that multiplicity group.
 
-oscillator = False
 mmnums = dict(
     [
         (
@@ -1189,78 +1407,51 @@ mmnums = dict(
     ]
 )
 
-print('\nAssigning {} multimappers: {}'.format(sum(mmnums.values()),args.READTYPE))
-residuals = 0
-for multiplicity in sorted(list(MM.keys())):
-    mmnum = mmnums[multiplicity]
-    print('\t{}: {}'.format(multiplicity,mmnum))
-    reads_were_assigned = True
-    while reads_were_assigned:
-        reads_were_assigned = False
-        mm_readsort = sorted(
-            list(MM[multiplicity].keys()),
-            reverse=oscillator
+mmreadnum = sum(mmnums.values())
+if mmreadnum > 0:
+    print('\nAssigning {} multimappers: {}'.format(mmreadnum,args.READTYPE))
+    residuals = 0
+    for multiplicity in sorted(list(MM.keys())):
+        residuals += run_mm_assignment(multiplicity)
+    
+    print(
+        '\tRescued {}% of multimappers.'.format(
+            round(
+                float(sum(mmnums.values()) - residuals)/sum(mmnums.values()),
+                3
+            )*100
         )
-        keep = []
-        for pos in mm_readsort:
-            current_read = MM[multiplicity].get(pos,{})
-            if not current_read:
-                continue
-            failed_to_map = {}
-            for k in current_read.keys():
-                read_object,value = current_read[k]
-                unmapped = assign_multimapper(read_object,value,allow_naive=False)
-                if unmapped:
-                    failed_to_map[k] = unmapped
-            MM[multiplicity][pos] = failed_to_map
-            if failed_to_map:
-                keep.append(pos)
-            else:
-                del MM[multiplicity][pos]
-                reads_were_assigned = True
-        oscillator = not oscillator
-    
-    # Assign any remaining reads in the current multiplicity group naively
-    residuals += sum(
-        [
-            count for obj,count in flatten(
-                [a.values() for a in MM[multiplicity].values()]
-            )
-        ]
     )
-    
-    if args.ALLOW_NAIVE:
-        mm_readsort = sorted(list(MM[multiplicity].keys()))
-        keep = []
-        for pos in mm_readsort:
-            current_read = MM[multiplicity].get(pos,{})
-            if not current_read:
-                continue
-            failed_to_map = {}
-            for k in current_read.keys():
-                read_object,value = current_read[k]
-                unmapped = assign_multimapper(read_object,value,allow_naive=True)
-                if unmapped:
-                    failed_to_map[k] = unmapped
-            MM[multiplicity][pos] = failed_to_map
-            if failed_to_map:
-                keep.append(pos)
-            else:
-                del MM[multiplicity][pos]
-                reads_were_assigned = True
-        
-        assert len(MM[multiplicity]) == 0, "ERROR: reads still remaining in {}:{}".format(args.READTYPE,multiplicity)
-
-print(
-    '\tRescued {}% of multimappers.'.format(
-        round(
-            float(sum(mmnums.values()) - residuals)/sum(mmnums.values()),
-            3
-        )*100
-    )
-)
+else:
+    if args.mmIO == "out":
+        print('Multimappers written to SAM files.')
+    else:
+        print('No residual multimappers.')
 
 print("All reads assigned. Writing files...")
+
+if args.SJ_OUT:
+    if args.mmIO == "out":
+        output_filename='{}_{}_SJ.mmIO.bed'.format(args.SAMPLENAME,args.READTYPE)
+    else:
+        output_filename='{}_{}_SJ.bed'.format(args.SAMPLENAME,args.READTYPE)
+    
+    outfile = open(output_filename, 'w')
+    name = '.'
+    for strand in ['+','-','.']:
+        for chrom in SJ[strand].keys():
+            for key in SJ[strand][chrom].keys():
+                left,right = key
+                count = round(SJ[strand][chrom][key],2)
+                outfile.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(
+                    chrom,
+                    left,
+                    right,
+                    name,
+                    count,
+                    strand
+                ))
+    outfile.close()
 
 for strand in ['+','-']:
     print('\t{} {}'.format(args.READTYPE,strand))
@@ -1269,32 +1460,60 @@ for strand in ['+','-']:
     if strand == '-':
         STRAND = 'minus'
     #input, output_filename, digits=2, parallel=False, multi_key=False)
-    write_bedgraph_from_dict(
-        ENDPOINT[strand],
-        output_filename='{}_{}_{}.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-        parallel=args.PARALLEL,
-        multi_key=False
-    )
-    write_bedgraph_from_dict(
-        COVERAGE[strand],
-        output_filename='{}_{}_{}_coverage.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-        parallel=args.PARALLEL,
-        multi_key=False
-    )
-    if args.SIZE_CLASSES:
+    if args.mmIO == "out":
         write_bedgraph_from_dict(
-            READLENGTHS[strand],
-            output_filename='{}_{}_{}_sizeclass.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+            ENDPOINT[strand],
+            output_filename='{}_{}_{}.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
             parallel=args.PARALLEL,
-            multi_key=args.SIZE_CLASSES
+            multi_key=False
         )
-    if args.UNTEMP_OUT:
         write_bedgraph_from_dict(
-            UNTEMP[strand],
-            output_filename='{}_{}_{}_untemp.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+            COVERAGE[strand],
+            output_filename='{}_{}_{}_coverage.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
             parallel=args.PARALLEL,
-            multi_key=args.UNTEMP_OUT
+            multi_key=False
         )
+        if args.SIZE_CLASSES:
+            write_bedgraph_from_dict(
+                READLENGTHS[strand],
+                output_filename='{}_{}_{}_sizeclass.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+                parallel=args.PARALLEL,
+                multi_key=args.SIZE_CLASSES
+            )
+        if args.UNTEMP_OUT:
+            write_bedgraph_from_dict(
+                UNTEMP[strand],
+                output_filename='{}_{}_{}_untemp.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+                parallel=args.PARALLEL,
+                multi_key=args.UNTEMP_OUT
+            )
+    else:
+        write_bedgraph_from_dict(
+            ENDPOINT[strand],
+            output_filename='{}_{}_{}.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+            parallel=args.PARALLEL,
+            multi_key=False
+        )
+        write_bedgraph_from_dict(
+            COVERAGE[strand],
+            output_filename='{}_{}_{}_coverage.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+            parallel=args.PARALLEL,
+            multi_key=False
+        )
+        if args.SIZE_CLASSES:
+            write_bedgraph_from_dict(
+                READLENGTHS[strand],
+                output_filename='{}_{}_{}_sizeclass.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+                parallel=args.PARALLEL,
+                multi_key=args.SIZE_CLASSES
+            )
+        if args.UNTEMP_OUT:
+            write_bedgraph_from_dict(
+                UNTEMP[strand],
+                output_filename='{}_{}_{}_untemp.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
+                parallel=args.PARALLEL,
+                multi_key=args.UNTEMP_OUT
+            )
 
 
 print("Coverage calculations complete!")

@@ -31,10 +31,6 @@ parser.add_argument(
     action='store', nargs=2
 )
 parser.add_argument(
-    'genome', metavar='FASTA',
-    type=str, help='genome FASTA file'
-)
-parser.add_argument(
     '-C', '--capped_output', dest='capped_output', metavar='"file"',
     type=str, help='output bed for capped features', action='store',
     default='capped_features.bed'
@@ -47,7 +43,7 @@ parser.add_argument(
 parser.add_argument(
     '--minimum', dest='minimum', type=int,
     help='minumum number of reads in a feature to keep it',
-    default=5
+    default=1
 )
 parser.add_argument(
     '--min_uug', dest='min_uug', type=float,
@@ -82,7 +78,7 @@ def percentile_bin(values, normalize=False, digits=2):
     
     [bin - 1] <= v < [bin]
     """
-    outputbin = range(0,10**digits + 1)
+    outputbin = list(range(0,10**digits + 1))
     
     if normalize:
         minval = min(values)
@@ -115,29 +111,16 @@ def percentile_bin(values, normalize=False, digits=2):
 # LOAD ENVIRONMENT #
 ####################
 
-# 'genome' is a dict of strings of the genome: {name:string}
-genome = fu.import_genome(args.genome)
-
-# 'chromosomes' contains the lengths of all chromosomes
-chromosomes = {}
-for chrom in genome.keys():
-    length = len(genome[chrom])
-    chromosomes[chrom] = length
-
 # 'features' contains all elements of the input BED file
 features = {}
-for readtype in ['TSS', 'TES']:
-    for strand in ['plus', 'minus']:
-        features[readtype + strand] = {}
-
-for chromosome in chromosomes.keys():
-    for readtype in ['TSS', 'TES']:
-        for strand in ['plus', 'minus']:
-            features[readtype + strand][chromosome] = {}
+for strand in ['+', '-']:
+    features[strand] = {}
 
 feature_file = open(args.bed_in)
 for line in feature_file:
-    if line[0] == '#':continue
+    if line[0] == '#':
+        continue
+    
     l = line.rstrip().split('\t')
     score = l[4]
     chrom = l[0]
@@ -145,15 +128,13 @@ for line in feature_file:
     end_pos = int(l[2])
     peak_pos = int(l[6]) + start_pos
     secondary = l[-1]
-    
+    strand = l[5]
     readname = l[3]
-    readtype = 'TSS'
-    if l[5] == '+':
-        strand = 'plus'
-    elif l[5] == '-':
-        strand = 'minus'
+
+    if chrom not in features[strand]:
+        features[strand][chrom] = {}
     
-    features[readtype + strand][chrom][peak_pos] = [
+    features[strand][chrom][peak_pos] = [
         (start_pos,end_pos),
         score,
         readname,
@@ -167,16 +148,11 @@ feature_file.close()
 # Saves the value of the respective BEDGRAPH file at each position.
 coverage = {}
 coverage['all'] = {}
-coverage['all']['plus'] = {}
-coverage['all']['minus'] = {}
+coverage['all']['+'] = {}
+coverage['all']['-'] = {}
 coverage['uug'] = {}
-coverage['uug']['plus'] = {}
-coverage['uug']['minus'] = {}
-for chrom,chromlen in chromosomes.items():
-    coverage['all']['plus'][chrom] = [0]*chromlen
-    coverage['all']['minus'][chrom] = [0]*chromlen
-    coverage['uug']['plus'][chrom] = [0]*chromlen
-    coverage['uug']['minus'][chrom] = [0]*chromlen    
+coverage['uug']['+'] = {}
+coverage['uug']['-'] = {}
     
 all_plus = args.all_bedgraphs[0]
 all_minus = args.all_bedgraphs[1]
@@ -185,93 +161,92 @@ uug_minus = args.uug_bedgraphs[1]
 
 print('Loading all plus...')
 for line in open(all_plus):
+    if line[0] =='#':
+        continue
+    
     chrom,start,end,count = line.rstrip().split()
     count = float(count)
-    coverage['all']['plus'][chrom][int(start):int(end)] = [count]*(int(end)-int(start))
+    if chrom not in coverage['all']['+']:
+        coverage['all']['+'][chrom] = {}
+    
+    for pos in range(int(start),int(end)):
+        coverage['all']['+'][chrom][pos] = count
 
 print('Loading all minus...')
 for line in open(all_minus):
+    if line[0] =='#':
+        continue
+    
     chrom,start,end,count = line.rstrip().split()
+    if chrom not in coverage['all']['-']:
+        coverage['all']['-'][chrom] = {}
+    
     count = float(count)
-    coverage['all']['minus'][chrom][int(start):int(end)] = [count]*(int(end)-int(start))
+    for pos in range(int(start),int(end)):
+        coverage['all']['-'][chrom][pos] = count
 
 print('Loading uuG plus...')
 for line in open(uug_plus):
+    if line[0] =='#':
+        continue
+    
     chrom,start,end,count = line.rstrip().split()
+    if chrom not in coverage['uug']['+']:
+        coverage['uug']['+'][chrom] = {}
+    
     count = float(count)
-    coverage['uug']['plus'][chrom][int(start):int(end)] = [count]*(int(end)-int(start))
+    for pos in range(int(start),int(end)):
+        coverage['uug']['+'][chrom][pos] = count
 
 print('Loading uuG minus...')
 for line in open(uug_minus):
+    if line[0] =='#':
+        continue
+    
     chrom,start,end,count = line.rstrip().split()
+    if chrom not in coverage['uug']['-']:
+        coverage['uug']['-'][chrom] = {}
+    
     count = float(count)
-    coverage['uug']['minus'][chrom][int(start):int(end)] = [count]*(int(end)-int(start))
+    for pos in range(int(start),int(end)):
+        coverage['uug']['-'][chrom][pos] = count
 
 print("Evaluating features...")
 allfeatures = []
-for readtype in ['TSS']:
-    for strand in ['plus','minus']:
-        for chrom in sorted(list(chromosomes.keys())):
-            for peakpos,feature in features[readtype + strand][chrom].items():
+chromosomes = set()
+
+for strand in ['+','-']:
+    for key in features[strand].keys():
+        chromosomes.add(key)
+
+
+for strand in ['+','-']:
+    for chrom in sorted(list(chromosomes)):
+        if chrom in features[strand]:
+            for peakpos,feature in features[strand][chrom].items():
                 # read feature traits from the dict
                 startend,score,readname,secondary = feature
                 start,end = [int(i) for i in startend]
                 
-                # slice coverage dicts for values overlapping this feature
-                all_reads = coverage['all'][strand][chrom][start:end]
-                uug_reads = coverage['uug'][strand][chrom][start:end]
+                # Get coverage values overlapping this feature
+                all_reads = float(0)
+                if chrom in coverage['all'][strand]:
+                    for pos in range(start,end):
+                        all_reads += coverage['all'][strand][chrom].get(pos,0)
                 
-                # get the nucleotide sequence immediately upstream
-                if strand == 'plus':
-                    upstream_seqs = genome[chrom][(start-1):(end-1)]
-                elif strand == 'minus':
-                    upstream_seqs = ''.join(
-                        reversed(
-                            fu.rc(
-                                genome[chrom][(start+1):(end+1)]
-                            )
-                        )
-                    )
+                uug_reads = 0
+                if chrom in coverage['uug'][strand]:
+                    for pos in range(start,end):
+                        uug_reads += coverage['uug'][strand][chrom].get(pos,0)
                 
                 # discard a feature with less than minimum reads
-                if sum(all_reads) < args.minimum:
+                if all_reads < args.minimum:
                     continue
-                
-                # get positions without a templated upstream G
-                # non_tuG = which([i != 'G' for i in upstream_seqs])
-                
-                # TRY: treat all positions as informative (capped features seldom have tuGs)
-                non_tuG = list(range(len(upstream_seqs)))
-                
-                # calculate the total reads and uuG reads at non-tuG sites
-                informative_all = sum(
-                    [
-                        all_reads[i]
-                        for i in non_tuG
-                    ]
-                )
-                
-                # Discard peaks with no reads informative of
-                # whether or not the feature is capped
-                if informative_all == 0:
-                    continue
-                
-                informative_uuG = sum(
-                    [
-                        uug_reads[i]
-                        for i in non_tuG
-                    ]
-                )
-                
+
                 # Calculate percent uuG and pipe the feature appropriately
-                percent_uuG = float(informative_uuG)/informative_all
+                percent_uuG = float(uug_reads)/all_reads
                 
                 # Make a BED feature string
-                if strand == 'plus':
-                    s = '+'
-                elif strand == 'minus':
-                    s = '-'
-                
                 feature_to_write = '\t'.join(
                     [
                         chrom,
@@ -279,7 +254,7 @@ for readtype in ['TSS']:
                         str(end),
                         readname,
                         str(score),
-                        s,
+                        strand,
                         str(int(peakpos)-start),
                         secondary,
                         str(round(percent_uuG,3))
@@ -288,28 +263,27 @@ for readtype in ['TSS']:
                 
                 allfeatures.append((feature_to_write,percent_uuG))
 
-
-# Determine the cutoff for partitioning capped and noncapped features
-# by locating the local minimum in distribution of uuG reads
-print("Determining percent uuG cutoff...")
-all_uuG = [b for a,b in allfeatures]
-uug_dist = percentile_bin(all_uuG, normalize=False, digits=2)
-uug_sub = uug_dist[:len(uug_dist)/4]
-minima = which(uug_sub,min(uug_sub))
-if len(minima) == 1:
-    cutoff = float(minima[0])/100
-else:
-    print("# WARNING: More than 1 local minimum")
-    cutoff = float(sum(minima)/len(minima))/100
-
-print("# Local minimum: {}".format(cutoff))
 if args.min_uug:
     cutoff = args.min_uug
     print("# Cutoff: {}".format(cutoff))
+else:
+    # Determine the cutoff for partitioning capped and noncapped features
+    # by locating the local minimum in distribution of uuG reads
+    print("Determining percent uuG cutoff...")
+    all_uuG = [b for a,b in allfeatures]
+    uug_dist = percentile_bin(all_uuG, normalize=False, digits=2)
+    uug_sub = uug_dist[:int(len(uug_dist)/4)]
+    minima = which(uug_sub,min(uug_sub))
+    if len(minima) == 1:
+        cutoff = float(minima[0])/100
+    else:
+        print("# WARNING: More than 1 local minimum")
+        cutoff = float(sum(minima)/len(minima))/100
+    print("# Local minimum: {}".format(cutoff))
+    print("# uuG distribution:")
+    for a,b in zip(range(0,10**2 + 1),uug_dist):
+        print('{}\t{}'.format(a,b))
 
-print("# uuG distribution:")
-for a,b in zip(range(0,10**2 + 1),uug_dist):
-    print('{}\t{}'.format(a,b))
 
 # Write the features to 'capped' or 'noncapped' output based on the cutoff
 capped_out = open(args.capped_output, 'w')
