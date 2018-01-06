@@ -28,9 +28,13 @@ if [ -z "$genome_fasta" ]
 then
     genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
 fi
+if [ -z "$transcript_fasta" ]
+then
+    transcript_fasta=$resource_dir/transcript.fasta
+fi
 if [ -z "$reference_table" ]
 then
-    reference_table=$resource_dir/reference_table_EndMask.txt
+    reference_table=$resource_dir/reference_table_EndGene.txt
 fi
 if [ -z "$annotation_gff" ]
 then
@@ -58,7 +62,7 @@ then
 fi
 if [ -z "$output_folder" ]
 then
-    output_folder=$results_dir/EndMask
+    output_folder=$results_dir/EndGene
 fi
 
 ############################
@@ -88,220 +92,101 @@ input_array=($input_mapper)
 line_number=${input_array[0]}  # Line number of reference table (should match job number)
 SAMPLE_NAME=${input_array[1]}  # name of sample type
 sample_list=$(echo ${input_array[2]} | tr ',' ' ')  # parse the comma-separated list of sample names
+MASK_NAME=${input_array[3]} # name of the sample type whose capped features should be used
 
 #####################
 # ENVIRONMENT SETUP #
 #####################
 
 length_table=$resource_dir/length.table
+tso_mask_file=$resource_dir/transcript_TSO_mask.bed
 mask=$python_dir/bedgraph_mask.py
 coverage=$python_dir/bed_feature_coverage.py
-samples=($sample_list)
 endmap_folder=$results_dir/EndMap
+endmask_folder=$results_dir/EndMask
+
 endgraph_folder=$temp_dir
-output_folder=$results_dir/EndMask
+output_folder=$results_dir/EndGene
 data_folder=$output_folder/$SAMPLE_NAME
+capped_features=$endmask_folder/$MASK_NAME/$MASK_NAME.capped.bed
 
-echo "Samples: ${samples[@]}"
-echo "Sample type: $SAMPLE_NAME"
-
+rm -R $data_folder
 mkdir -p $data_folder
 cd $data_folder
 
-echo "Setting up exon reference..."
-grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\([^;\.]*\).*/\1/' > exons_by_gene.gff
-awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' exons_by_gene.gff > exons.bed
-
-##################
-# MERGE FEATURES #
-##################
-
-echo "Merging feature files..."
-rm -f $SAMPLE_NAME.all.bed
-touch $SAMPLE_NAME.all.bed
-plus_list=()
-minus_list=()
-plus_list_uug=()
-minus_list_uug=()
-for s in ${samples[@]}
-do
-    sed "s/\tTSS\./\t"$s"\.TSS\./" \
-        $endgraph_folder/$s/$s.end_features.bed \
-        >> $SAMPLE_NAME.all.bed
-    
-    plus_list+=($endgraph_folder/$s/TSS_plus_mask.bedgraph)
-    minus_list+=($endgraph_folder/$s/TSS_minus_mask.bedgraph)
-    plus_list_uug+=($endgraph_folder/$s/uuG_plus_mask.bedgraph)
-    minus_list_uug+=($endgraph_folder/$s/uuG_minus_mask.bedgraph)
-done
-
-echo "Bedgraph files +: "${plus_list[@]}
-echo "Bedgraph files -: "${minus_list[@]}
-bedtools unionbedg -i ${plus_list[@]} > combined_plus.bedgraph
-bedtools unionbedg -i ${minus_list[@]} > combined_minus.bedgraph
-
-colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
-i=4
-sumstring='$4'
-while [ "$i" -lt "$colnum" ]
-do
-  i=$(($i + 1))
-  sumstring+='+$'$i
-done
-
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.minus.bedgraph
-rm combined_*us.bedgraph
-
-echo "Bedgraph uuG files +: "${plus_list_uug[@]}
-echo "Bedgraph uuG files -: "${minus_list_uug[@]}
-bedtools unionbedg -i ${plus_list_uug[@]} > combined_plus.bedgraph
-bedtools unionbedg -i ${minus_list_uug[@]} > combined_minus.bedgraph
-
-colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
-i=4
-sumstring='$4'
-while [ "$i" -lt "$colnum" ]
-do
-  i=$(($i + 1))
-  sumstring+='+$'$i
-done
-
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $SAMPLE_NAME.uuG.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $SAMPLE_NAME.uuG.minus.bedgraph
-rm combined_*us.bedgraph
-echo "Merged coverage files generated."
-
-# Merge all touching/overlapping features from all reps
-bedtools merge \
-    -s \
-    -nms \
-    -n \
-    -d 0 \
-    -i $SAMPLE_NAME.all.bed \
-    > $SAMPLE_NAME.merged.bed
-
-# Keep only replicable features (present in more than one library)
-grep -v -P '\t1\t' $SAMPLE_NAME.merged.bed \
-    > $SAMPLE_NAME.rep.bed
-
-
-rm $SAMPLE_NAME.all.bed $SAMPLE_NAME.merged.bed
-
-bedfile=$SAMPLE_NAME.rep.bed
-
-# Locate the nearest (sense) gene in exons_by_gene.gff
-bedtools closest \
-    -s \
-    -D b \
-    -t first \
-    -a $bedfile \
-    -b exons_by_gene.gff \
-    > $SAMPLE_NAME.closest_gene.bed
-
-# Ath_chr1        310073  310434  Ath_chr1.636;Ath_chr1.672;Ath_chr1.652  3       +       Ath_chr1        TAIR10  exon    310316  310981  .       +       .       AT1G01900       0
-awk '{printf $1"\t"$2"\t"$3"\tTSS."NR"\t"$16"\t"$6"\t"$15"\n"}' $SAMPLE_NAME.closest_gene.bed \
-    > $SAMPLE_NAME.gene.bed
-
-# Adding a merged peak position ot each replicable feature, keeping both the closest gene ID and distance
-python $python_dir/bed_find_peaks.py \
-    -I $SAMPLE_NAME.gene.bed \
-    -O $SAMPLE_NAME.all_features.bed \
-    -BP $SAMPLE_NAME.plus.bedgraph \
-    -BM $SAMPLE_NAME.minus.bedgraph \
-    -L $length_table \
-    -V pass
-
-rm -f $SAMPLE_NAME.closest_gene.bed $SAMPLE_NAME.gene.bed
-
-echo "Splitting capped and noncapped features..."
-
-python $python_dir/bed_uug_filter.py \
-    -C $SAMPLE_NAME.capped.bed \
-    -U $SAMPLE_NAME.noncapped.bed \
-    --min_uug 0.1 \
-    $SAMPLE_NAME.all_features.bed \
-    $SAMPLE_NAME.plus.bedgraph \
-    $SAMPLE_NAME.minus.bedgraph \
-    $SAMPLE_NAME.uuG.plus.bedgraph \
-    $SAMPLE_NAME.uuG.minus.bedgraph \
-    $genome_fasta
-
-echo "Cap masking bedgraph files..."
-
-capped_bedgraphs=()
-noncapped_bedgraphs=()
-names=()
-
-for s in ${samples[@]}
-do
-    python $mask \
-    -P $endgraph_folder/$s/TSS_plus_mask.bedgraph \
-    -M $endgraph_folder/$s/TSS_minus_mask.bedgraph \
-    -PO $data_folder/$s.capmask.plus.bedgraph \
-    -MO $data_folder/$s.capmask.minus.bedgraph \
-    -I $SAMPLE_NAME.capped.bed \
-    -L $length_table
-    
-    names+=( $s.plus $s.minus )
-    capped_bedgraphs+=( $endgraph_folder/$s/TSS_plus_mask.bedgraph $endgraph_folder/$s/TSS_minus_mask.bedgraph )
-    noncapped_bedgraphs+=( $data_folder/$s.capmask.plus.bedgraph $data_folder/$s.capmask.minus.bedgraph )
-done
-
-echo "Cap masking merged bedgraph..."
-python $mask \
--P $SAMPLE_NAME.plus.bedgraph \
--M $SAMPLE_NAME.minus.bedgraph \
--PO $SAMPLE_NAME.capmask.plus.bedgraph \
--MO $SAMPLE_NAME.capmask.minus.bedgraph \
--I $SAMPLE_NAME.capped.bed \
--L $length_table
+samples=($sample_list)
+echo "Samples: ${samples[@]}"
+echo "Sample type: $SAMPLE_NAME"
 
 ###########################
 # CALCULATE READ COVERAGE #
 ###########################
 
-echo "Making gene-level bed file..."
-# Subset 5' end features for only those that are
-# (1) capped, and
-# (2) within 50nt of an existing gene annotation
+echo "Determining dominant transcript for $SAMPLE_NAME..."
+python $python_dir/bedgraph_genome_to_transcripts.py \
+    --subset $annotation_subset \
+    --output $SAMPLE_NAME.all.transcript.bedgraph \
+    $endmask_folder/$MASK_NAME/$MASK_NAME.plus.bedgraph \
+    $endmask_folder/$MASK_NAME/$MASK_NAME.minus.bedgraph \
+    $annotation_gff \
+    $genome_fasta
 
-awk -F'[\t]' \
-    'function abs(v) {return v < 0 ? -v : v};
-    {if (abs($5) <= 50){ print }}' \
-    $SAMPLE_NAME.capped.bed \
-    > $SAMPLE_NAME.overlapping.capped.bed
+python $python_dir/bedgraph_dominant_transcripts.py \
+    -I $SAMPLE_NAME.all.transcript.bedgraph \
+    -F $transcript_fasta \
+    -O $SAMPLE_NAME.dom.transcript.bedgraph \
+    -L $SAMPLE_NAME.dominant_transcript_lengths.tsv
 
-cat $SAMPLE_NAME.overlapping.capped.bed exons.bed > "$SAMPLE_NAME"_gene_features.bed
-rm $SAMPLE_NAME.overlapping.capped.bed
+rm $SAMPLE_NAME.all.transcript.bedgraph $SAMPLE_NAME.dom.transcript.bedgraph
 
-echo "Calculating gene-level total and uncapped read coverage..."
-python $coverage \
-    -F $SAMPLE_NAME.capped.bed \
-    -I ${capped_bedgraphs[@]} \
-    -N ${names[@]} \
-    -O "$SAMPLE_NAME"_capped_coverage.tsv \
-    -L $length_table 
+echo "Making gene-level bed files..."
+bedgraph_list=()
+for s in ${samples[@]}
+do
+    # Perform cap masking on all 5' end bedgraphs (genome level)
+    echo Capmasking: $s
+    python $mask \
+        -P $endmap_folder/$s/"$s"_plus.5p.bedgraph \
+        -M $endmap_folder/$s/"$s"_minus.5p.bedgraph \
+        -PO $data_folder/$s.capmask.plus.bedgraph \
+        -MO $data_folder/$s.capmask.minus.bedgraph \
+        -I $capped_features \
+        -L $length_table
+    
+    # Generate dominant transcript-level cap masked bedgraphs
+    echo Converting to transcripts: $s
+    python $python_dir/bedgraph_genome_to_transcripts.py \
+        --subset $SAMPLE_NAME.dominant_transcript_lengths.tsv \
+        --output $s.transcript.capmasked.bedgraph \
+        $data_folder/$s.capmask.plus.bedgraph \
+        $data_folder/$s.capmask.minus.bedgraph \
+        $annotation_gff \
+        $genome_fasta
+    
+    # Additionally mask TSO sequences in transcript-level bedgraphs
+    echo TSO masking: $s
+    python $mask \
+        -P $s.transcript.capmasked.bedgraph \
+        -PO $data_folder/$s.transcript.bedgraph \
+        -U $tso_mask_file \
+        -L $SAMPLE_NAME.dominant_transcript_lengths.tsv
+    
+    # Remove intermediate files
+    rm $s.transcript.capmasked.bedgraph
+    bedgraph_list+=( $s.transcript.bedgraph )
+done
 
-python $coverage \
-    -F $SAMPLE_NAME.noncapped.bed \
-    -I ${capped_bedgraphs[@]} \
-    -N ${names[@]} \
-    -O "$SAMPLE_NAME"_noncapped_coverage.tsv \
-    -L $length_table
+bedtools unionbedg -i ${bedgraph_list[@]} > $SAMPLE_NAME.merge.transcript.bedgraph
 
-python $coverage \
-    -F "$SAMPLE_NAME"_gene_features.bed \
-    -I ${capped_bedgraphs[@]} \
-    -N ${names[@]} \
-    -O "$SAMPLE_NAME"_total_coverage.tsv \
-    -L $length_table
+colnum=$(head -n 1 $SAMPLE_NAME.merge.transcript.bedgraph | awk '{print NF}')
+i=4
+sumstring='$4'
+while [ "$i" -lt "$colnum" ]
+do
+  i=$(($i + 1))
+  sumstring+='+$'$i
+done
 
-python $coverage \
-    -F "$SAMPLE_NAME"_gene_features.bed \
-    -I ${noncapped_bedgraphs[@]} \
-    -N ${names[@]} \
-    -O "$SAMPLE_NAME"_capmasked_coverage.tsv \
-    -L $length_table
-
+awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  $SAMPLE_NAME.merge.transcript.bedgraph > $SAMPLE_NAME.transcript.bedgraph
+rm $SAMPLE_NAME.merge.transcript.bedgraph
 

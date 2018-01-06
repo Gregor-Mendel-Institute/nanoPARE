@@ -1,23 +1,27 @@
+--runMode alignReads \
 --alignIntronMax 10000 \
 --alignMatesGapMax 11000 \
 --alignSJDBoverhangMin 1 \
 --alignSJoverhangMin 10 \
+--outSJfilterOverhangMin -1 10 10 10 \
+--outSJfilterCountTotalMin -1 2 2 2 \
+--outSJfilterCountUniqueMin -1 2 2 2 \
+--outFilterType BySJout \
 --outFilterMismatchNmax 2 \
 --outFilterMismatchNoverLmax .05 \
---outFilterType BySJout \
+--twopassMode Basic \
 --genomeDir $genome_index_dir \
 --genomeSAindexNbases $index_base_number \
 --limitBAMsortRAM "$RAM"000000000 \
 --outFilterIntronMotifs RemoveNoncanonicalUnannotated \
---outFilterMultimapNmax 100 \
 --outReadsUnmapped Fastx \
---outSAMattributes NH HI AS nM NM MD jM jI XS \
+--outFilterMultimapNmax 100 \
 --outSAMmultNmax 100 \
---outSAMtype BAM Unsorted \
+--outSAMattributes NH HI AS nM NM MD jM jI XS \
 --outSAMprimaryFlag AllBestScore \
+--outSAMtype BAM Unsorted \
 --outTmpDir $temp_dir_s \
 --quantMode GeneCounts \
---runMode alignReads \
 --runRNGseed 12345 \
 --runThreadN $CPUS \
 --sjdbGTFfile $annotation_gff

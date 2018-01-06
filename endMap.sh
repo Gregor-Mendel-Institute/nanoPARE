@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# EndMap
+# Aligns RNA-seq reads from 5P or BODY experiments to a reference genome
+# 1) Trims adapter sequences with cutadapt
+# 2) Performs gapped alignment with STAR
+# 3) Converts mapped reads to coverage values with readmapIO
+
 ################
 # CONFIG SETUP #
 ################
@@ -85,7 +91,7 @@ line_number=${input_array[0]}  # Line number of reference table (should match jo
 fastq_dir=${input_array[1]}    # Directory containing the fastq file
 input_fastq=${input_array[2]}  # FASTQ filename(s), comma-separated
 SAMPLE_NAME=${input_array[3]}  # Name of the sample
-library_type=${input_array[4]} # Options: BODY, TSS. Type of the FASTQ file
+library_type=${input_array[4]} # Options: BODY, 5P. Type of the FASTQ file
 read_type=${input_array[5]}    # Options: SE, PE, for single end or paired end libraries
 adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from the 3' end of reads
 RAM=30
@@ -97,35 +103,22 @@ mkdir -p $sample_dir
 
 if [ $read_type == "SE" ]
 then
-    if [ $library_type == "TSS" ]
+    if [ $library_type == "5P" ]
     then
         star_params_allreads="$OPTIONS_star_global \
         --alignEndsType Local \
-        --outSJfilterOverhangMin -1 10 10 10 \
-        --outSJfilterCountTotalMin -1 2 2 2 \
-        --outSJfilterCountUniqueMin -1 2 2 2 \
-        --twopassMode Basic \
-        --outFilterMismatchNoverLmax 0.05 \
         --outFilterMatchNminOverLread 0.9 \
-        --readFilesIn $sample_dir/TSO_single_cleaned.fastq \
-        --outFileNamePrefix $sample_dir/TSSstar_single/"
+        --readFilesIn $sample_dir/"$sample_name"_cleaned.1.fastq \
+        --outFileNamePrefix $sample_dir/star/"
     else
         star_params_allreads="$OPTIONS_star_global \
         --alignEndsType EndToEnd \
-        --outSJfilterOverhangMin -1 10 10 10 \
-        --outSJfilterCountTotalMin -1 2 2 2 \
-        --outSJfilterCountUniqueMin -1 2 2 2 \
-        --twopassMode Basic \
         --outFileNamePrefix $sample_dir/star/ \
         --readFilesIn $sample_dir/"$sample_name"_cleaned.1.fastq"
     fi
 elif [ $read_type == "PE" ]
     star_params_allreads="$OPTIONS_star_global \
     --alignEndsType EndToEnd \
-    --outSJfilterOverhangMin -1 10 10 10 \
-    --outSJfilterCountTotalMin -1 2 2 2 \
-    --outSJfilterCountUniqueMin -1 2 2 2 \
-    --twopassMode Basic \
     --outFileNamePrefix $sample_dir/star/ \
     --readFilesIn $sample_dir/"$sample_name"_cleaned.1.fastq $sample_dir/"$sample_name"_cleaned.2.fastq"
 fi
@@ -219,7 +212,7 @@ cd $sample_dir
 
 keep_untrimmed="true"
 
-if [[ $library_type == "TSS" ]]
+if [[ $library_type == "5P" ]]
 then
     adapters=( $(echo $adapter_str | tr "," " ") )
     number_of_adapters=${#adapters[@]}
@@ -317,19 +310,19 @@ rm "$SAMPLE_NAME".fastq
 echo Generating bedgraph files...
 samtools view -h star/Aligned.out.bam > "$SAMPLE_NAME".sam
 
-if [[ $library_type == "TSS" ]]
+if [[ $library_type == "5P" ]]
 then
-    python $python_dir/sam_calculate_coverages.py \
+    python $python_dir/readmapIO.py \
         -S "$SAMPLE_NAME".5p \
         -I "$SAMPLE_NAME".sam \
-        -R TSS \
+        -R 5P \
         -F $genome_fasta \
         --softclip_type 5p \
         --untemp_out A C G T \
         --secondary \
         --allow_naive
 else
-    python $python_dir/sam_calculate_coverages.py \
+    python $python_dir/readmapIO.py \
         -S "$SAMPLE_NAME".5p \
         -I "$SAMPLE_NAME".sam \
         -R $library_type \
@@ -343,7 +336,7 @@ rm "$SAMPLE_NAME".sam
 bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_plus.bedgraph > "$SAMPLE_NAME"_plus.5p.bedgraph
 bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_minus.bedgraph > "$SAMPLE_NAME"_minus.5p.bedgraph
 
-if [[ $library_type == "TSS" ]]
+if [[ $library_type == "5P" ]]
 then
     bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_plus_untemp.bedgraph | \
         awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n }' > "$SAMPLE_NAME"_plus.uG.bedgraph

@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# EndGraph
+# Identification of end features through subtractive kernel density estimation
+# 1) Determines a scaling factor to adjust read depths of 5P/3P and BODY libraries
+# 2) Signal smoothing by fitting a kernel to END - BODY read values
+# 3) Convert continuous regions of positive signal to features in a BED file
+
 ################
 # CONFIG SETUP #
 ################
