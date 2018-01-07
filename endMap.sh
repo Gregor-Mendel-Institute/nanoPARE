@@ -44,9 +44,9 @@ if [ -z "$annotation_subset" ]
 then
     annotation_subset=$resource_dir/annotation_subset.txt
 fi
-if [ -z "$SAMPLE_NAME" ]
+if [ -z "$sample_name" ]
 then
-    SAMPLE_NAME="sample"
+    sample_name="sample"
 fi
 if [ -z "$LMOD" ]
 then
@@ -89,7 +89,7 @@ input_array=($input_mapper)
 line_number=${input_array[0]}  # Line number of reference table (should match job number)
 fastq_dir=${input_array[1]}    # Directory containing the fastq file
 input_fastq=${input_array[2]}  # FASTQ filename(s), comma-separated
-SAMPLE_NAME=${input_array[3]}  # Name of the sample
+sample_name=${input_array[3]}  # Name of the sample
 library_type=${input_array[4]} # Options: BODY, 5P. Type of the FASTQ file
 read_type=${input_array[5]}    # Options: SE, PE, for single end or paired end libraries
 adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from the 3' end of reads
@@ -98,7 +98,7 @@ echo "Parsed reference table:"
 echo "Line number: $line_number"
 echo "FASTQ directory: $fastq_dir"
 echo "FASTQ file name: $input_fastq"
-echo "Sample name: $SAMPLE_NAME"
+echo "Sample name: $sample_name"
 echo "Library type: $library_type"
 echo "Read type: $read_type"
 echo "Adapter sequence(s): $adapter_str"
@@ -108,7 +108,7 @@ temp_dir_s=$temp_dir/star/$sample_name
 rm -rf $temp_dir_s
 OPTIONS_star_global=$(cat $resource_dir/OPTIONS_star_global)
 
-sample_dir=$temp_dir/$SAMPLE_NAME
+sample_dir=$temp_dir/$sample_name
 rm -rf $sample_dir
 mkdir -p $sample_dir
 
@@ -233,31 +233,31 @@ then
     then
         first_trim_command="cutadapt \
             -a ${adapters[0]} \
-            -o "$SAMPLE_NAME"_trim1.fastq \
-            --untrimmed-output "$SAMPLE_NAME"_untrimmed1.fastq \
-            "$SAMPLE_NAME".1.fastq"
+            -o "$sample_name"_trim1.fastq \
+            --untrimmed-output "$sample_name"_untrimmed1.fastq \
+            "$sample_name".1.fastq"
 
         second_trim_command="cutadapt \
             -a ${adapters[1]} \
-            -o "$SAMPLE_NAME"_trim2.fastq \
-            "$SAMPLE_NAME"_untrimmed1.fastq"
+            -o "$sample_name"_trim2.fastq \
+            "$sample_name"_untrimmed1.fastq"
 
         echo $first_trim_command
         eval $first_trim_command
         echo $second_trim_command
         eval $second_trim_command
 
-        cat "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_trim2.fastq > "$SAMPLE_NAME"_adaptertrim.fastq
-        rm -f "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_trim2.fastq "$SAMPLE_NAME"_untrimmed1.fastq
+        cat "$sample_name"_trim1.fastq "$sample_name"_trim2.fastq > "$sample_name"_adaptertrim.fastq
+        rm -f "$sample_name"_trim1.fastq "$sample_name"_trim2.fastq "$sample_name"_untrimmed1.fastq
 
     else
         if [[ $number_of_adapters -eq 1 ]]
         then
             trim_command="cutadapt \
                 -a ${adapters[0]} \
-                -o "$SAMPLE_NAME"_adaptertrim.fastq \
-                --untrimmed-output "$SAMPLE_NAME"_untrimmed1.fastq
-                "$SAMPLE_NAME".1.fastq"
+                -o "$sample_name"_adaptertrim.fastq \
+                --untrimmed-output "$sample_name"_untrimmed1.fastq
+                "$sample_name".1.fastq"
 
             echo $trim_command
             eval $trim_command
@@ -265,22 +265,22 @@ then
         else
             if [[ $keep_untrimmed == "true" ]]
             then
-                cat "$SAMPLE_NAME".fastq "$SAMPLE_NAME"_untrimmed1.fastq > "$SAMPLE_NAME"_adaptertrim.fastq
+                cat "$sample_name".fastq "$sample_name"_untrimmed1.fastq > "$sample_name"_adaptertrim.fastq
             else
-                cat "$SAMPLE_NAME".fastq > "$SAMPLE_NAME"_adaptertrim.fastq
+                cat "$sample_name".fastq > "$sample_name"_adaptertrim.fastq
             fi
         fi
     fi
-    cat "$SAMPLE_NAME"_adaptertrim.fastq > "$SAMPLE_NAME"_trimmed.fastq
-    python $python_dir/fastq_drop_short_reads.py . "$SAMPLE_NAME"_trimmed.fastq "$SAMPLE_NAME"_cleaned.fastq 16
+    cat "$sample_name"_adaptertrim.fastq > "$sample_name"_trimmed.fastq
+    python $python_dir/fastq_drop_short_reads.py . "$sample_name"_trimmed.fastq "$sample_name"_cleaned.fastq 16
 
     echo "Removing trim intermediates"
-    rm -f "$SAMPLE_NAME"_trim1.fastq "$SAMPLE_NAME"_adaptertrim.fastq "$SAMPLE_NAME"_trimmed.fastq
+    rm -f "$sample_name"_trim1.fastq "$sample_name"_adaptertrim.fastq "$sample_name"_trimmed.fastq
     echo "Adapter trimming complete."
 
     echo "Filtering out low-complexity reads..."
-    python $python_dir/fastq_complexity_filter.py $sample_dir "$SAMPLE_NAME"_cleaned.fastq "$SAMPLE_NAME"_filtered.fastq 0.15
-    rm -f "$SAMPLE_NAME"_cleaned.fastq
+    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_filtered.fastq 0.15
+    rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
     TN5_1='TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
@@ -314,19 +314,19 @@ fi
 
 echo "### PHASE 2: MAPPING READS TO THE GENOME WITH STAR ###"
 mkdir -p $sample_dir/star
-echo "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
-eval "STAR $star_params_allreads >& $SAMPLE_NAME.star.log"
+echo "STAR $star_params_allreads >& $sample_name.star.log"
+eval "STAR $star_params_allreads >& $sample_name.star.log"
 
-rm "$SAMPLE_NAME".fastq
+rm "$sample_name".fastq
 
 echo Generating bedgraph files...
-samtools view -h star/Aligned.out.bam > "$SAMPLE_NAME".sam
+samtools view -h star/Aligned.out.bam > "$sample_name".sam
 
 if [[ $library_type == "5P" ]]
 then
     python $python_dir/readmapIO.py \
-        -S "$SAMPLE_NAME".5p \
-        -I "$SAMPLE_NAME".sam \
+        -S "$sample_name".5p \
+        -I "$sample_name".sam \
         -R 5P \
         -F $genome_fasta \
         --softclip_type 5p \
@@ -335,53 +335,53 @@ then
         --allow_naive
 else
     python $python_dir/readmapIO.py \
-        -S "$SAMPLE_NAME".5p \
-        -I "$SAMPLE_NAME".sam \
+        -S "$sample_name".5p \
+        -I "$sample_name".sam \
         -R $library_type \
         -F $genome_fasta \
         --secondary \
         --allow_naive
 fi
 
-rm "$SAMPLE_NAME".sam 
+rm "$sample_name".sam 
 
-bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_plus.bedgraph > "$SAMPLE_NAME"_plus.5p.bedgraph
-bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_minus.bedgraph > "$SAMPLE_NAME"_minus.5p.bedgraph
+bedtools sort -i "$sample_name".5p_"$library_type"_plus.bedgraph > "$sample_name"_plus.5p.bedgraph
+bedtools sort -i "$sample_name".5p_"$library_type"_minus.bedgraph > "$sample_name"_minus.5p.bedgraph
 
 if [[ $library_type == "5P" ]]
 then
-    bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_plus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$SAMPLE_NAME"_plus.uG.bedgraph
-    bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_minus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$SAMPLE_NAME"_minus.uG.bedgraph
+    bedtools sort -i "$sample_name".5p_"$library_type"_plus_untemp.bedgraph | \
+        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_plus.uG.bedgraph
+    bedtools sort -i "$sample_name".5p_"$library_type"_minus_untemp.bedgraph | \
+        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_minus.uG.bedgraph
     # Calculate transcript_level coverage by parsing the genome coverage values
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $annotation_subset \
-        --output "$SAMPLE_NAME"_transcript.bedgraph \
-        "$SAMPLE_NAME"_plus.5p.bedgraph \
-        "$SAMPLE_NAME"_minus.5p.bedgraph \
+        --output "$sample_name"_transcript.bedgraph \
+        "$sample_name"_plus.5p.bedgraph \
+        "$sample_name"_minus.5p.bedgraph \
         $annotation_gff \
         $genome_fasta
 else
     # Calculate transcript_level coverage by parsing the genome coverage values
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $annotation_subset \
-        --output "$SAMPLE_NAME"_transcript.bedgraph \
-        "$SAMPLE_NAME"_minus.5p.bedgraph \
-        "$SAMPLE_NAME"_plus.5p.bedgraph \
+        --output "$sample_name"_transcript.bedgraph \
+        "$sample_name"_minus.5p.bedgraph \
+        "$sample_name"_plus.5p.bedgraph \
         $annotation_gff \
         $genome_fasta
     
 fi
 
-rm "$SAMPLE_NAME".5p_"$library_type"_plus.bedgraph \
-    "$SAMPLE_NAME".5p_"$library_type"_minus.bedgraph
+rm "$sample_name".5p_"$library_type"_plus.bedgraph \
+    "$sample_name".5p_"$library_type"_minus.bedgraph
 
-# rm "$SAMPLE_NAME"*coverage.bedgraph
+# rm "$sample_name"*coverage.bedgraph
 
 echo "Moving final files to results folder..."
-mkdir -p $results_dir/EndMap/$SAMPLE_NAME
-cp $sample_dir/*.bedgraph $results_dir/EndMap/$SAMPLE_NAME/
-cat $sample_dir/comptable.tsv > $results_dir/EndMap/$SAMPLE_NAME/"$SAMPLE_NAME".comptable.tsv
+mkdir -p $results_dir/EndMap/$sample_name
+cp $sample_dir/*.bedgraph $results_dir/EndMap/$sample_name/
+cat $sample_dir/comptable.tsv > $results_dir/EndMap/$sample_name/"$sample_name".comptable.tsv
 
 echo Pipeline complete!
