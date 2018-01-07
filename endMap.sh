@@ -83,7 +83,6 @@ REQUIRED_MODULES=( --bedtools --cutadapt --rna-star --samtools )
 . $bash_dir/load_modules.sh
 echo " "
 
-OPTIONS_star_global=$(cat $resource_dir/OPTIONS_star_global)
 input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
 input_array=($input_mapper)
 
@@ -95,8 +94,20 @@ library_type=${input_array[4]} # Options: BODY, 5P. Type of the FASTQ file
 read_type=${input_array[5]}    # Options: SE, PE, for single end or paired end libraries
 adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from the 3' end of reads
 RAM=30
+echo "Parsed reference table:"
+echo "Line number: $line_number"
+echo "FASTQ directory: $fastq_dir"
+echo "FASTQ file name: $input_fastq"
+echo "Sample name: $SAMPLE_NAME"
+echo "Library type: $library_type"
+echo "Read type: $read_type"
+echo "Adapter sequence(s): $adapter_str"
 
-mkdir -p $temp_dir
+mkdir -p $temp_dir/star
+temp_dir_s=$temp_dir/star/$sample_name
+rm -rf $temp_dir_s
+OPTIONS_star_global=$(cat $resource_dir/OPTIONS_star_global)
+
 sample_dir=$temp_dir/$SAMPLE_NAME
 rm -rf $sample_dir
 mkdir -p $sample_dir
@@ -117,6 +128,7 @@ then
         --readFilesIn $sample_dir/"$sample_name"_cleaned.1.fastq"
     fi
 elif [ $read_type == "PE" ]
+then
     star_params_allreads="$OPTIONS_star_global \
     --alignEndsType EndToEnd \
     --outFileNamePrefix $sample_dir/star/ \
@@ -223,7 +235,7 @@ then
             -a ${adapters[0]} \
             -o "$SAMPLE_NAME"_trim1.fastq \
             --untrimmed-output "$SAMPLE_NAME"_untrimmed1.fastq \
-            "$SAMPLE_NAME".fastq"
+            "$SAMPLE_NAME".1.fastq"
 
         second_trim_command="cutadapt \
             -a ${adapters[1]} \
@@ -245,7 +257,7 @@ then
                 -a ${adapters[0]} \
                 -o "$SAMPLE_NAME"_adaptertrim.fastq \
                 --untrimmed-output "$SAMPLE_NAME"_untrimmed1.fastq
-                "$SAMPLE_NAME".fastq"
+                "$SAMPLE_NAME".1.fastq"
 
             echo $trim_command
             eval $trim_command
@@ -339,9 +351,9 @@ bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_minus.bedgraph > "$SAMPLE_NAM
 if [[ $library_type == "5P" ]]
 then
     bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_plus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n }' > "$SAMPLE_NAME"_plus.uG.bedgraph
+        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$SAMPLE_NAME"_plus.uG.bedgraph
     bedtools sort -i "$SAMPLE_NAME".5p_"$library_type"_minus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n }' > "$SAMPLE_NAME"_minus.uG.bedgraph
+        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$SAMPLE_NAME"_minus.uG.bedgraph
     # Calculate transcript_level coverage by parsing the genome coverage values
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $annotation_subset \
