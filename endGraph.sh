@@ -5,13 +5,16 @@
 # 1) Determines a scaling factor to adjust read depths of 5P/3P and BODY libraries
 # 2) Signal smoothing by fitting a kernel to END - BODY read values
 # 3) Convert continuous regions of positive signal to features in a BED file
+# Expects EndMap to be run and the results in the directory /results/EndMap/
 
 ################
 # CONFIG SETUP #
 ################
 # Storing all default global environment variables
-
-root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -z "$root_dir" ]
+then
+    root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Temporary $root_dir relative to this script's location if it isn't already in the environment
+fi
 bash_dir=$root_dir/scripts/bash_scripts
 python_dir=$root_dir/scripts/python_scripts
 r_dir=$root_dir/scripts/r_scripts
@@ -19,22 +22,51 @@ resource_dir=$root_dir/resources
 temp_dir=$root_dir/temp
 log_dir=$root_dir/log
 results_dir=$root_dir/results
+genome_index_dir=$temp_dir/genome_index
 
-genome_fasta=$resource_dir/genome.fasta
-annotation_gff=$resource_dir/annotation.gff
-TSS_PLUS=$resource_dir/TSS_plus.bedgraph
-TSS_MINUS=$resource_dir/TSS_minus.bedgraph
-TES_PLUS=$resource_dir/TES_plus.bedgraph
-TES_MINUS=$resource_dir/TES_minus.bedgraph
-BODY_PLUS=$resource_dir/BODY_plus.bedgraph
-BODY_MINUS=$resource_dir/BODY_minus.bedgraph
-UUG_PLUS=
-UUG_MINUS=
+# Set defaults for variables if they are not already in the environment
+if [ -z "$JOB_NUMBER" ]
+then
+    JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+fi
+if [ -z "$genome_fasta" ]
+then
+    genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
+fi
+if [ -z "$reference_table" ]
+then
+    reference_table=$resource_dir/reference_table_EndGraph.txt
+fi
+if [ -z "$endmap_reference_table" ]
+then
+    endmap_reference_table=$resource_dir/reference_table_EndMap.txt
+fi
 
-SAMPLE_NAME="sample"
-LMOD=0
-CPUS=1
-SETUP=false
+if [ -z "$annotation_gff" ]
+then
+    annotation_gff=$resource_dir/annotation.gff
+fi
+if [ -z "$annotation_subset" ]
+then
+    annotation_subset=$resource_dir/annotation_subset.txt
+fi
+if [ -z "$sample_name" ]
+then
+    sample_name="sample"
+fi
+if [ -z "$LMOD" ]
+then
+    LMOD=0
+fi
+if [ -z "$CPUS" ]
+then
+    CPUS=1
+fi
+if [ -z "$SETUP" ]
+then
+    SETUP=false
+fi
+
 KERNEL='laplace'
 
 ############################
@@ -44,8 +76,6 @@ KERNEL='laplace'
 # arguments (see read_cmdline.sh), and writing a config file
 
 . $bash_dir/read_cmdline.sh
-temp_dir=$temp_dir/$SAMPLE_NAME
-mkdir -p $temp_dir
 
 echo "################"
 echo "### ENDGRAPH ###"
@@ -54,11 +84,28 @@ echo " "
 echo "Config settings:"
 . $bash_dir/list_settings.sh
 
-
 # Environment modules to load with Lmod (if option --lmod is passed)
 REQUIRED_MODULES=( --bedtools --python )
 . $bash_dir/load_modules.sh
 echo " "
+
+# 5P_PLUS=$resource_dir/5P_plus.bedgraph
+# 5P_MINUS=$resource_dir/5P_minus.bedgraph
+# 3P_PLUS=$resource_dir/3P_plus.bedgraph
+# 3P_MINUS=$resource_dir/3P_minus.bedgraph
+# BODY_PLUS=$resource_dir/BODY_plus.bedgraph
+# BODY_MINUS=$resource_dir/BODY_minus.bedgraph
+
+input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
+input_array=($input_mapper)
+
+line_number=${input_array[0]}  # Line number of reference table (should match job number)
+sample_name=${input_array[1]}  # Name of the positive sample
+body_name=${input_array[2]}    # Name of the background sample
+library_type=${input_array[3]} # Options: 5P, 3P. Type of the positive sample
+
+temp_dir=$temp_dir/$sample_name
+mkdir -p $temp_dir
 
 if [ $SETUP == "true" ]
 then
@@ -75,7 +122,7 @@ then
     python $python_dir/fasta_sequence_search.py \
         $genome_fasta \
         $resource_dir/mask_sequences.table \
-        $resource_dir
+        -O $resource_dir
     echo "Masking BED files generated."
     echo "Setup complete."
     exit 0
@@ -87,7 +134,7 @@ echo "### STEP 1: BEDGRAPH ARTIFACT MASKING ###"
 echo "#########################################"
 echo " "
 # Generates a list of BED features indicating sites in the genome 
-# where TSS or TES reads are likely methodological artifacts:
+# where 5P or 3P reads are likely methodological artifacts:
 #   TSO oligos perform strand invasion at internal sites complementary
 #     to their 3' ends (Tang et al. 2012, Nucleic Acids Research)
 #   oligo(dT) priming results in internal priming artifacts at templated 
@@ -95,65 +142,39 @@ echo " "
 # Customize what sequences are masked by editing the file 
 # /resources/mask_sequences.table
 
-if [ -f $TSS_PLUS ] && [ -f $TSS_MINUS ]
-then
-    TSS="true"
-    cp $TSS_PLUS $temp_dir/TSS_plus.bedgraph
-    cp $TSS_MINUS $temp_dir/TSS_minus.bedgraph
-else
-    TSS=false
-fi
-if [ -f $TES_PLUS ] && [ -f $TES_MINUS ]
-then
-    TES="true"
-    cp $TES_PLUS $temp_dir/TES_plus.bedgraph
-    cp $TES_MINUS $temp_dir/TES_minus.bedgraph
-else
-    TES=false
-fi
-cp $BODY_PLUS $temp_dir/BODY_plus.bedgraph
-if [ -f $BODY_MINUS ]
-then
-    cp $BODY_MINUS $temp_dir/BODY_minus.bedgraph
-else
-    cp $BODY_PLUS $temp_dir/BODY_minus.bedgraph
-fi
+#TODO: Update behavior for $library_type == 5P or 3P
 
-if [ $TSS == "true" ]
-then
-    python $python_dir/bedgraph_mask.py \
-        -P $temp_dir/TSS_plus.bedgraph \
-        -M $temp_dir/TSS_minus.bedgraph \
-        -PO $temp_dir/TSS_plus_mask.bedgraph \
-        -MO $temp_dir/TSS_minus_mask.bedgraph \
-        -U $resource_dir/TSS_mask_up.bed \
-        -L $resource_dir/length.table
-fi
-if [ $TES == "true" ]
-then
-    python $python_dir/bedgraph_mask.py \
-        -P $temp_dir/TES_plus.bedgraph \
-        -M $temp_dir/TES_minus.bedgraph \
-        -PO $temp_dir/TES_plus_mask.bedgraph \
-        -MO $temp_dir/TES_minus_mask.bedgraph \
-        -D $resource_dir/TES_mask_down.bed \
-        -L $resource_dir/length.table
-fi
+cp $temp_dir/$body_name/"$body_name"_BODY_plus.bedgraph $temp_dir/BODY_plus.bedgraph
+cp $temp_dir/$body_name/"$body_name"_BODY_minus.bedgraph $temp_dir/BODY_minus.bedgraph
 
-if [ -z $UUG_PLUS ]
+if [ $library_type == "5P" ]
 then
-    echo "uuG files not provided. Skipping uuG masking."
-else
-    echo "uuG files: $UUG_PLUS $UUG_MINUS"
     python $python_dir/bedgraph_mask.py \
-        -P $UUG_PLUS \
-        -M $UUG_MINUS \
+        -P $temp_dir/"$sample_name"_5P_plus.bedgraph \
+        -M $temp_dir/"$sample_name"_5P_minus.bedgraph \
+        -PO $temp_dir/5P_plus_mask.bedgraph \
+        -MO $temp_dir/5P_minus_mask.bedgraph \
+        -U $resource_dir/5P_mask_up.bed \
+        -L $resource_dir/length.table
+    
+    python $python_dir/bedgraph_mask.py \
+        -P $temp_dir/"$sample_name"_plus.uG.bedgraph \
+        -M $temp_dir/"$sample_name"_minus.uG.bedgraph \
         -PO $temp_dir/uuG_plus_mask.bedgraph \
         -MO $temp_dir/uuG_minus_mask.bedgraph \
-        -U $resource_dir/TSS_mask_up.bed \
+        -U $resource_dir/5P_mask_up.bed \
         -L $resource_dir/length.table
 fi
-
+if [ $library_type == "3P" ]
+then
+    python $python_dir/bedgraph_mask.py \
+        -P $temp_dir/"$sample_name"_3P_plus.bedgraph \
+        -M $temp_dir/"$sample_name"_3P_minus.bedgraph \
+        -PO $temp_dir/3P_plus_mask.bedgraph \
+        -MO $temp_dir/3P_minus_mask.bedgraph \
+        -D $resource_dir/3P_mask_down.bed \
+        -L $resource_dir/length.table
+fi
 
 echo "Step 1 complete."
 
@@ -164,129 +185,89 @@ echo "####################################################################"
 echo " "
 # Performs a meta-analysis of annotated transcripts to determine 2 parameters:
 #     Optimal bandwidth for kernel density estimation
-#     Scaling factor to adjust for capture efficiency of TSS/TES/BODY reads
+#     Scaling factor to adjust for capture efficiency of 5P/3P/BODY reads
 #
 # Generates four scaled subtractive bedgraph files:
-#     TSSplus  - BODYminus
-#     TSSminus - BODYplus
-#     TESplus  - BODYplus
-#     TESminus - BODYminus
+#     5Pplus  - BODYminus
+#     5Pminus - BODYplus
+#     3Pplus  - BODYplus
+#     3Pminus - BODYminus
 
-TSS_scale=1
-TES_scale=1
+scale=1
 SCALE_CAP=10
 BANDWIDTH_CAP=30
 
-if [ $TSS == "true" ]
+flip_5p="true"
+
+if [[ $library_type == "5P" ]]
 then
-    python $python_dir/bedgraph_rescale.py \
-        -P $temp_dir/TSS_plus_mask.bedgraph \
-        -N $temp_dir/BODY_minus.bedgraph \
-        -A $annotation_gff \
-        -S + \
-        --position TSS \
-        --align \
-        > $temp_dir/TSS_scale_plus.txt
-    
-    python $python_dir/bedgraph_rescale.py \
-        -P $temp_dir/TSS_minus_mask.bedgraph \
-        -N $temp_dir/BODY_plus.bedgraph \
-        -A $annotation_gff \
-        -S - \
-        --align \
-        --position TSS \
-        > $temp_dir/TSS_scale_minus.txt
-    
-    TSS_plus_scales=( $(tail -n 1 $temp_dir/TSS_scale_plus.txt) )
-    TSS_minus_scales=( $(tail -n 1 $temp_dir/TSS_scale_minus.txt) )
-    TSS_scale=$(printf "%.2f" $(echo "(${TSS_plus_scales[0]} + ${TSS_minus_scales[0]}) / 2" | bc -l))
-    TSS_bandwidth=$(printf "%.0f" $(echo "(${TSS_plus_scales[1]} + ${TSS_minus_scales[1]}) / 2" | bc -l))
-    
-    if [ $(echo "$TSS_scale > $SCALE_CAP" | bc -l) -eq 1 ]
-    then    
-        TSS_scale=$SCALE_CAP
-        echo "TSS hit scale cap of $SCALE_CAP"
-    fi
-
-    if [ $(echo "$TSS_BANDWIDTH > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
+    if [[ $flip_5p == "true" ]]
     then
-        TSS_bandwidth=$BANDWIDTH_CAP
-        echo "TSS hit bandwidth cap of $BANDWIDTH_CAP"
+        bg_plus=$temp_dir/BODY_minus.bedgraph
+        bg_minus=$temp_dir/BODY_plus.bedgraph
+    else
+        bg_plus=$temp_dir/BODY_plus.bedgraph
+        bg_minus=$temp_dir/BODY_minus.bedgraph    
     fi
-
-    
-    unionBedGraphs -i $temp_dir/TSS_plus_mask.bedgraph \
-        $temp_dir/BODY_minus.bedgraph \
-        > $temp_dir/tmp.bedgraph
-    
-    awk -v mult=$TSS_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-        > $temp_dir/TSS_plus_subtract.bedgraph
-    
-    unionBedGraphs -i $temp_dir/TSS_minus_mask.bedgraph \
-        $temp_dir/BODY_plus.bedgraph \
-        > $temp_dir/tmp.bedgraph
-    
-    awk -v mult=$TSS_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-        > $temp_dir/TSS_minus_subtract.bedgraph
+else
+    bg_plus=$temp_dir/BODY_plus.bedgraph
+    bg_minus=$temp_dir/BODY_minus.bedgraph
 fi
 
-if [ $TES == "true" ]
-then
-    python $python_dir/bedgraph_rescale.py \
-        -P $temp_dir/TES_plus_mask.bedgraph \
-        -N $temp_dir/BODY_plus.bedgraph \
-        -A $annotation_gff \
-        -S + \
-        --position TES \
-        --align \
-        > $temp_dir/TES_scale_plus.txt
-        
-    python $python_dir/bedgraph_rescale.py \
-        -P $temp_dir/TES_minus_mask.bedgraph \
-        -N $temp_dir/BODY_minus.bedgraph \
-        -A $annotation_gff \
-        -S - \
-        --position TES \
-        --align \
-        > $temp_dir/TES_scale_minus.txt
-    
-    TES_plus_scales=( $(tail -n 1 $temp_dir/TES_scale_plus.txt) )
-    TES_minus_scales=( $(tail -n 1 $temp_dir/TES_scale_minus.txt) )
-    TES_scale=$(printf "%.2f" $(echo "(${TES_plus_scales[0]} + ${TES_minus_scales[0]}) / 2" | bc -l))
-    TES_bandwidth=$(printf "%.0f" $(echo "(${TES_plus_scales[2]} + ${TES_minus_scales[2]}) / 2" | bc -l))
-    
-    if [ $(echo "$TES_scale > $SCALE_CAP" | bc -l) -eq 1 ]
-    then
-        TES_scale=$SCALE_CAP
-        echo "TES hit scale cap of $SCALE_CAP"
-    fi
-    
-    if [ $(echo "$TES_bandwidth > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
-    then
-        TES_bandwidth=$BANDWIDTH_CAP
-        echo "TES hit bandwidth cap of $BANDWIDTH_CAP"
-    fi
 
-    unionBedGraphs -i $temp_dir/TES_plus_mask.bedgraph \
-        $temp_dir/BODY_plus.bedgraph \
-        > $temp_dir/tmp.bedgraph
+python $python_dir/bedgraph_rescale.py \
+    -P $temp_dir/"$library_type"_plus_mask.bedgraph \
+    -N $bg_plus \
+    -A $annotation_gff \
+    -S + \
+    --position $library_type \
+    --align \
+    > $temp_dir/"$library_type"_scale_plus.txt
 
-    awk -v mult=$TES_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-        > $temp_dir/TES_plus_subtract.bedgraph
+python $python_dir/bedgraph_rescale.py \
+    -P $temp_dir/"$library_type"_minus_mask.bedgraph \
+    -N $bg_minus \
+    -A $annotation_gff \
+    -S - \
+    --align \
+    --position $library_type \
+    > $temp_dir/"$library_type"_scale_minus.txt
 
-    unionBedGraphs -i $temp_dir/TES_minus_mask.bedgraph \
-        $temp_dir/BODY_minus.bedgraph \
-        > $temp_dir/tmp.bedgraph
+plus_scales=( $(tail -n 1 $temp_dir/"$library_type"_scale_plus.txt) )
+minus_scales=( $(tail -n 1 $temp_dir/"$library_type"_scale_minus.txt) )
+scale=$(printf "%.2f" $(echo "(${plus_scales[0]} + ${minus_scales[0]}) / 2" | bc -l))
+bandwidth=$(printf "%.0f" $(echo "(${plus_scales[1]} + ${minus_scales[1]}) / 2" | bc -l))
 
-    awk -v mult=$TES_scale \
-        '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-        > $temp_dir/TES_minus_subtract.bedgraph
+if [ $(echo "$scale > $SCALE_CAP" | bc -l) -eq 1 ]
+then    
+    scale=$SCALE_CAP
+    echo "hit scale cap of $SCALE_CAP"
 fi
 
-echo "$TSS_scale $TES_scale" > $temp_dir/final_scaling_factors.tab
+if [ $(echo "$bandwidth > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
+then
+    bandwidth=$BANDWIDTH_CAP
+    echo "hit bandwidth cap of $BANDWIDTH_CAP"
+fi
+
+unionBedGraphs -i $temp_dir/"$library_type"_plus_mask.bedgraph \
+    $bg_plus \
+    > $temp_dir/tmp.bedgraph
+
+awk -v mult=$scale \
+    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+    > $temp_dir/"$library_type"_plus_subtract.bedgraph
+
+unionBedGraphs -i $temp_dir/"$library_type"_minus_mask.bedgraph \
+    $bg_minus \
+    > $temp_dir/tmp.bedgraph
+
+awk -v mult=$scale \
+    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
+    > $temp_dir/"$library_type"_minus_subtract.bedgraph
+
+
+echo $scale > $temp_dir/final_scaling_factors.tab
 rm $temp_dir/tmp.bedgraph
 
 ### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
@@ -299,115 +280,77 @@ echo " "
 # See the Python util "bedgraph_kernel_density.py" for full details.
 # Defaults to a summed Laplace distribution smoothing
 
-if [ $TSS == "true" ] && [ $TES == "true" ]
-then
-    readtypes=( TSS TES )
-elif [ $TSS == "true" ]
-then
-    readtypes=( TSS )
-else
-    readtypes=( TES )
-fi
-
-for readtype in ${readtypes[@]}
+for strand in plus minus
 do
-    if [ $readtype == 'TSS' ]
+    kernel_density_command="python \
+        $python_dir/bedgraph_kernel_density.py \
+        -B=$temp_dir/"$library_type"_"$strand"_subtract.bedgraph \
+        -O=$temp_dir/"$library_type"_"$strand"_smooth.bedgraph \
+        -L=$resource_dir/length.table \
+        -K=$KERNEL \
+        -H=$bandwidth \
+        -S=3 \
+        -D=3 \
+        -P \
+        -c $CPUS"
+    echo $kernel_density_command
+    eval $kernel_density_command
+    if [ ! -f $temp_dir/"$library_type"_"$strand"_smooth.bedgraph ]
     then
-        bandwidth=$TSS_bandwidth
-    else
-        bandwidth=$TES_bandwidth
+        echo "ERROR: Failed to generate "$library_type"_"$strand"_smooth.bedgraph"
+        exit 1
     fi
-    for strand in plus minus
-    do
-        kernel_density_command="python \
-            $python_dir/bedgraph_kernel_density.py \
-            -B=$temp_dir/"$readtype"_"$strand"_subtract.bedgraph \
-            -O=$temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
-            -L=$resource_dir/length.table \
-            -K=$KERNEL \
-            -H=$bandwidth \
-            -S=3 \
-            -D=3 \
-            -P \
-            -c $CPUS"
-        echo $kernel_density_command
-        eval $kernel_density_command
-        if [ ! -f $temp_dir/"$readtype"_"$strand"_smooth.bedgraph ]
-        then
-            echo "ERROR: Failed to generate "$readtype"_"$strand"_smooth.bedgraph"
-            exit 1
-        fi
-        feature_threshold_command="python \
-        $python_dir/bedgraph_thresh_to_bed.py \
-        -B $temp_dir/"$readtype"_"$strand"_smooth.bedgraph \
-        -O $temp_dir/"$readtype"_"$strand"_features.bed \
-        -L $resource_dir/length.table \
-        -T 0 \
-        -M 10 \
-        -V sum \
-        -S $strand"
-        echo $feature_threshold_command
-        eval $feature_threshold_command
-        if [ ! -f $temp_dir/"$readtype"_"$strand"_features.bed ]
-        then
-            echo "ERROR: Failed to generate "$readtype"_"$strand"_features.bed"
-            exit 1
-        fi
-    done
+    feature_threshold_command="python \
+    $python_dir/bedgraph_thresh_to_bed.py \
+    -B $temp_dir/"$library_type"_"$strand"_smooth.bedgraph \
+    -O $temp_dir/"$library_type"_"$strand"_features.bed \
+    -L $resource_dir/length.table \
+    -T 0 \
+    -M 10 \
+    -V sum \
+    -S $strand"
+    echo $feature_threshold_command
+    eval $feature_threshold_command
+    if [ ! -f $temp_dir/"$library_type"_"$strand"_features.bed ]
+    then
+        echo "ERROR: Failed to generate "$library_type"_"$strand"_features.bed"
+        exit 1
+    fi
 done
 
 # Merges all end features identified in PHASE 3.4 to a single BED file.
 touch $temp_dir/end_features_temp.bed
-if [ $TSS == "true" ]
-then
-    sed 's/thresh./TSS.plus./' $temp_dir/TSS_plus_features.bed \
-        >> $temp_dir/end_features_temp.bed
-    sed 's/thresh./TSS.minus./' $temp_dir/TSS_minus_features.bed \
-        >> $temp_dir/end_features_temp.bed
-fi
-if [ $TES == "true" ]
-then
-    sed 's/thresh./TES.plus./' $temp_dir/TES_plus_features.bed \
-        >> $temp_dir/end_features_temp.bed
-    sed 's/thresh./TES.minus./' $temp_dir/TES_minus_features.bed \
-        >> $temp_dir/end_features_temp.bed
-fi
+sed 's/thresh./'$library_type'.plus./' $temp_dir/"$library_type"_plus_features.bed \
+    >> $temp_dir/end_features_temp.bed
+sed 's/thresh./'$library_type'.minus./' $temp_dir/"$library_type"_minus_features.bed \
+    >> $temp_dir/end_features_temp.bed
+
 bedtools sort -i $temp_dir/end_features_temp.bed > $temp_dir/end_features.bed
 
 python $python_dir/bed_find_peaks.py \
     -I $temp_dir/end_features.bed \
     -L $resource_dir/length.table \
-    -O $temp_dir/$SAMPLE_NAME.rpm.features.bed \
-    -BP $temp_dir/TSS_plus_mask.bedgraph \
-    -BM $temp_dir/TSS_minus_mask.bedgraph \
+    -O $temp_dir/$sample_name.rpm.features.bed \
+    -BP $temp_dir/"$library_type"_plus_mask.bedgraph \
+    -BM $temp_dir/"$library_type"_minus_mask.bedgraph \
     -V rpm
 
-awk -F'[\t]' '{if ($5 >= .5){ print }}' $temp_dir/$SAMPLE_NAME.rpm.features.bed > $temp_dir/$SAMPLE_NAME.end_features.bed
+awk -F'[\t]' '{if ($5 >= .5){ print }}' $temp_dir/$sample_name.rpm.features.bed > $temp_dir/$sample_name.end_features.bed
 
 rm $temp_dir/end_features_temp.bed \
     $temp_dir/end_features.bed \
-    $temp_dir/$SAMPLE_NAME.rpm.features.bed \
-    $temp_dir/TSS_plus_features.bed \
-    $temp_dir/TSS_minus_features.bed \
-    $temp_dir/TES_plus_features.bed \
-    $temp_dir/TES_minus_features.bed \
+    $temp_dir/$sample_name.rpm.features.bed \
+    $temp_dir/"$library_type"_plus_features.bed \
+    $temp_dir/"$library_type"_minus_features.bed
+    $temp_dir/"$library_type"_plus_subtract.bedgraph \
+    $temp_dir/"$library_type"_minus_subtract.bedgraph
 
-rm $temp_dir/TSS_plus_subtract.bedgraph \
-    $temp_dir/TSS_minus_subtract.bedgraph \
-    $temp_dir/TES_plus_subtract.bedgraph \
-    $temp_dir/TSS_minus_subtract.bedgraph
-
-for readtype in ${readtypes[@]}
+for strand in plus minus
 do
-    for strand in plus minus
-    do
-        rm $temp_dir/"$readtype"_"$strand".bedgraph
-    done
+    rm $temp_dir/"$library_type"_"$strand".bedgraph
 done
 
 echo "Phase 3.4 complete."
 
-
-echo "PHASE 3 complete!"
-
+echo "EndGraph complete!"
 

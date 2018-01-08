@@ -8,5 +8,9 @@
 8 mg mg_11,mg_12,mg_13
 9 fb fb1_1to1,fb2_1to1,fb3_1to1
 10 fb_10to1 fb1_10to1,fb2_10to1,fb3_10to1
-11 d1_gl d1_gl_1,d1_gl_2,d1_gl_3
-12 d234_gl d234_gl_1,d234_gl_2,d234_gl_3
+11 xrn1_fb xrn1_fb_1,xrn1_fb_2,xrn1_fb_3
+12 1ng_fb 1ng_fb_1,1ng_fb_2,1ng_fb_3
+13 100pg_fb 100pg_fb_1,100pg_fb_2,100pg_fb_3
+14 10pg_fb 10pg_fb_1,10pg_fb_2,10pg_fb_3
+15 d1_gl d1_gl_1,d1_gl_2,d1_gl_3
+16 d234_gl d234_gl_1,d234_gl_2,d234_gl_3

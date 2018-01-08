@@ -34,7 +34,7 @@ then
 fi
 if [ -z "$reference_table" ]
 then
-    reference_table=$resource_dir/reference_table_EndGene.txt
+    reference_table=$resource_dir/reference_table_EndMask.txt
 fi
 if [ -z "$annotation_gff" ]
 then
@@ -62,7 +62,7 @@ then
 fi
 if [ -z "$output_folder" ]
 then
-    output_folder=$results_dir/EndGene
+    output_folder=$results_dir/EndMask
 fi
 
 ############################
@@ -103,12 +103,12 @@ tso_mask_file=$resource_dir/transcript_TSO_mask.bed
 mask=$python_dir/bedgraph_mask.py
 coverage=$python_dir/bed_feature_coverage.py
 endmap_folder=$results_dir/EndMap
-endmask_folder=$results_dir/EndMask
+endclass_folder=$results_dir/EndClass
 
 endgraph_folder=$temp_dir
-output_folder=$results_dir/EndGene
+output_folder=$results_dir/EndMask
 data_folder=$output_folder/$SAMPLE_NAME
-capped_features=$endmask_folder/$MASK_NAME/$MASK_NAME.capped.bed
+capped_features=$endclass_folder/$MASK_NAME/$MASK_NAME.capped.bed
 
 rm -R $data_folder
 mkdir -p $data_folder
@@ -126,8 +126,8 @@ echo "Determining dominant transcript for $SAMPLE_NAME..."
 python $python_dir/bedgraph_genome_to_transcripts.py \
     --subset $annotation_subset \
     --output $SAMPLE_NAME.all.transcript.bedgraph \
-    $endmask_folder/$MASK_NAME/$MASK_NAME.plus.bedgraph \
-    $endmask_folder/$MASK_NAME/$MASK_NAME.minus.bedgraph \
+    $endclass_folder/$MASK_NAME/$MASK_NAME.plus.bedgraph \
+    $endclass_folder/$MASK_NAME/$MASK_NAME.minus.bedgraph \
     $annotation_gff \
     $genome_fasta
 

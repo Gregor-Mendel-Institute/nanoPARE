@@ -151,13 +151,13 @@ for ID in ref_IDs:
     if exon_starts[0] < 0:
         exon_starts[0] = 0
     
-    if args.position in ['5','5p','start','TSS']:
+    if args.position in ['5','5P','5p','start','TSS']:
         # Check the strand of the transcript, and keep only the relevant terminal exon
         if strand == '+':
             positions = list(range(exon_starts[0] - 1, exon_ends[0]))
         elif strand == '-':
             positions = list(range(exon_starts[-1] - 1, exon_ends[-1]))
-    elif args.position in ['3','3p','end','TES']:
+    elif args.position in ['3','3P','3p','end','TES']:
         if strand == '+':
             positions = list(range(exon_starts[-1] - 1, exon_ends[-1]))
         elif strand == '-':
