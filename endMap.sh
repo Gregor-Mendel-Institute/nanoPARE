@@ -232,7 +232,11 @@ then
     adapters=( $(echo $adapter_str | tr "," " ") )
     number_of_adapters=${#adapters[@]}
     echo "Adapters: ${adapters[@]}"
-    if [[ $number_of_adapters -eq 2 ]]
+    if [ -z $adapters ]
+    then
+        echo "No adapter sequences specified. Skipping adapter trimming."
+        cat "$sample_name".1.fastq > "$sample_name"_adaptertrim.fastq
+    elif [[ $number_of_adapters -eq 2 ]]
     then
         first_trim_command="cutadapt \
             -a ${adapters[0]} \
