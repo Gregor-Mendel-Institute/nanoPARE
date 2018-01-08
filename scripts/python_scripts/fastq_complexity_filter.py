@@ -39,7 +39,7 @@ for i in file1:
         if len(entry1[1])>0:
             comp = Is(entry1[1],5)/len(entry1[1])
             if table_out:
-                rcomp = round(comp,3)
+                rcomp = round(comp,2)
                 comptable[rcomp] = comptable.get(rcomp,0)+1
             if comp>=mincomp:
                 tmp1.write('\n'.join(entry1)+'\n')

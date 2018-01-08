@@ -22,7 +22,7 @@ parser.add_argument(
 parser.add_argument(
     "-R", "--readtype", dest='READTYPE',
     help="Type of reads in input SAM file(s)",
-    choices=['BODY','TSS','TES','SRNA'], default="BODY", type=str
+    default="BODY", type=str
 )
 parser.add_argument(
     "-F", "--fasta", dest='FASTA',

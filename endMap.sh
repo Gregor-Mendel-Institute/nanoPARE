@@ -94,6 +94,9 @@ library_type=${input_array[4]} # Options: BODY, 5P. Type of the FASTQ file
 read_type=${input_array[5]}    # Options: SE, PE, for single end or paired end libraries
 adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from the 3' end of reads
 RAM=30
+minimum_readlength=16
+minimum_pairlength=16
+
 echo "Parsed reference table:"
 echo "Line number: $line_number"
 echo "FASTQ directory: $fastq_dir"
@@ -272,14 +275,14 @@ then
         fi
     fi
     cat "$sample_name"_adaptertrim.fastq > "$sample_name"_trimmed.fastq
-    python $python_dir/fastq_drop_short_reads.py . "$sample_name"_trimmed.fastq "$sample_name"_cleaned.fastq 16
+    python $python_dir/fastq_drop_short_reads.py $sample_dir "$sample_name"_trimmed.fastq "$sample_name"_cleaned.fastq $minimum_readlength
 
     echo "Removing trim intermediates"
     rm -f "$sample_name"_trim1.fastq "$sample_name"_adaptertrim.fastq "$sample_name"_trimmed.fastq
     echo "Adapter trimming complete."
 
     echo "Filtering out low-complexity reads..."
-    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_filtered.fastq 0.15
+    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq 0.15
     rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
@@ -300,6 +303,7 @@ else
     if [[ $read_type == "PE"* ]]
     then
         echo "Cleaning reads with fastq_drop_short_pairs.py"
+        # directory,mate1,mate2,out1,out2,minlen=sys.argv[1:7]
         echo "python $python_dir/fastq_drop_short_pairs.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name"_cleaned.1.fastq "$sample_name"_cleaned.2.fastq $minimum_pairlength"
         eval "python $python_dir/fastq_drop_short_pairs.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name"_cleaned.1.fastq "$sample_name"_cleaned.2.fastq $minimum_pairlength"
         rm "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name".1.fastq "$sample_name".2.fastq
@@ -317,7 +321,7 @@ mkdir -p $sample_dir/star
 echo "STAR $star_params_allreads >& $sample_name.star.log"
 eval "STAR $star_params_allreads >& $sample_name.star.log"
 
-rm "$sample_name".fastq
+# rm "$sample_name".fastq
 
 echo Generating bedgraph files...
 samtools view -h star/Aligned.out.bam > "$sample_name".sam
@@ -340,6 +344,7 @@ else
         -R $library_type \
         -F $genome_fasta \
         --secondary \
+        --allow_nonstranded \
         --allow_naive
 fi
 
