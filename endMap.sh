@@ -254,33 +254,29 @@ then
         echo $second_trim_command
         eval $second_trim_command
 
-        cat "$sample_name"_trim1.fastq "$sample_name"_trim2.fastq > "$sample_name"_adaptertrim.fastq
+        cat "$sample_name"_trim1.fastq "$sample_name"_trim2.fastq > "$sample_name"_trimmed.fastq
         rm -f "$sample_name"_trim1.fastq "$sample_name"_trim2.fastq "$sample_name"_untrimmed1.fastq
 
-    else
-        if [[ $number_of_adapters -eq 1 ]]
+    elif [[ $number_of_adapters -eq 1 ]]
+    then
+        trim_command="cutadapt \
+            -a ${adapters[0]} \
+            -o "$sample_name"_adaptertrim.fastq \
+            --untrimmed-output "$sample_name"_untrimmed1.fastq \
+            "$sample_name".1.fastq"
+            
+        echo $trim_command
+        eval $trim_command
+        if [[ $keep_untrimmed == "true" ]]
         then
-            trim_command="cutadapt \
-                -a ${adapters[0]} \
-                -o "$sample_name"_adaptertrim.fastq \
-                --untrimmed-output "$sample_name"_untrimmed1.fastq
-                "$sample_name".1.fastq"
-
-            echo $trim_command
-            eval $trim_command
-
+            cat "$sample_name"_adaptertrim.fastq "$sample_name"_untrimmed1.fastq > "$sample_name"_trimmed.fastq
         else
-            if [[ $keep_untrimmed == "true" ]]
-            then
-                cat "$sample_name".fastq "$sample_name"_untrimmed1.fastq > "$sample_name"_adaptertrim.fastq
-            else
-                cat "$sample_name".fastq > "$sample_name"_adaptertrim.fastq
-            fi
+            cat "$sample_name"_adaptertrim.fastq > "$sample_name"_trimmed.fastq
         fi
     fi
-    cat "$sample_name"_adaptertrim.fastq > "$sample_name"_trimmed.fastq
+      
     python $python_dir/fastq_drop_short_reads.py $sample_dir "$sample_name"_trimmed.fastq "$sample_name"_cleaned.fastq $minimum_readlength
-
+    
     echo "Removing trim intermediates"
     rm -f "$sample_name"_trim1.fastq "$sample_name"_adaptertrim.fastq "$sample_name"_trimmed.fastq
     echo "Adapter trimming complete."
@@ -290,8 +286,10 @@ then
     rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
-    TN5_1='TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
-    TN5_2='GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+    adapters=( $(echo $adapter_str | tr "," " ") )
+    echo "Adapters: ${adapters[@]}"
+    TN5_1=${adapters[0]}
+    TN5_2=${adapters[1]}
     TN5_1rc=$(python $python_dir/stdin_rc.py $TN5_1 RC)
     TN5_2rc=$(python $python_dir/stdin_rc.py $TN5_2 RC)
     echo "tn5.1: $TN5_1 (reverse complement $TN5_1rc)"
