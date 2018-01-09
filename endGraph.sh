@@ -319,6 +319,7 @@ do
 done
 
 # Merges all end features identified in PHASE 3.4 to a single BED file.
+rm -f $sample_dir/end_features_temp.bed
 touch $sample_dir/end_features_temp.bed
 sed 's/thresh./'$library_type'.plus./' $sample_dir/"$library_type"_plus_features.bed \
     >> $sample_dir/end_features_temp.bed
