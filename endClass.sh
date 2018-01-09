@@ -229,8 +229,7 @@ python $python_dir/bed_uug_filter.py \
     $sample_name.plus.bedgraph \
     $sample_name.minus.bedgraph \
     $sample_name.uuG.plus.bedgraph \
-    $sample_name.uuG.minus.bedgraph \
-    $genome_fasta
+    $sample_name.uuG.minus.bedgraph
 
 echo "Cap masking bedgraph files..."
 
