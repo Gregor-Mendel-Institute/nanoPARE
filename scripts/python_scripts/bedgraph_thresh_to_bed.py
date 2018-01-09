@@ -127,7 +127,7 @@ def find_bed_features(chrom,chromlen,queue):
             
             peak_positions = find_peaks(coverage_subset)
             if len(peak_positions) == 0:
-                print('WARNING: no peaks found in {}:{}-{}; skipping.'.format(chrom,chromStart,chromEnd))
+                # print('WARNING: no peaks found in {}:{}-{}; skipping.'.format(chrom,chromStart,chromEnd))
                 continue
             peak_heights = [coverage_subset[i] for i in peak_positions]
             ordered_peaks = [
@@ -144,7 +144,7 @@ def find_bed_features(chrom,chromlen,queue):
             ]
             peak = ordered_peaks[0]
             if len(ordered_peaks) > 1:
-                other_peaks = [str(i) for i in ordered_peaks[1:]]
+                other_peaks = [str(i) for i in ordered_peaks[1:10]]
             else:
                 other_peaks = ['-']
             
