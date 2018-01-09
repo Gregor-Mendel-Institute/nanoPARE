@@ -104,8 +104,8 @@ sample_name=${input_array[1]}  # Name of the positive sample
 body_name=${input_array[2]}    # Name of the background sample
 library_type=${input_array[3]} # Options: 5P, 3P. Type of the positive sample
 
-temp_dir=$temp_dir/$sample_name
-mkdir -p $temp_dir
+sample_dir=$temp_dir/$sample_name
+mkdir -p $sample_dir
 
 if [ $SETUP == "true" ]
 then
@@ -144,34 +144,34 @@ echo " "
 
 #TODO: Update behavior for $library_type == 5P or 3P
 
-cp $temp_dir/$body_name/"$body_name"_BODY_plus.bedgraph $temp_dir/BODY_plus.bedgraph
-cp $temp_dir/$body_name/"$body_name"_BODY_minus.bedgraph $temp_dir/BODY_minus.bedgraph
+cp $temp_dir/$body_name/"$body_name"_plus.bedgraph $sample_dir/BODY_plus.bedgraph
+cp $temp_dir/$body_name/"$body_name"_minus.bedgraph $sample_dir/BODY_minus.bedgraph
 
 if [ $library_type == "5P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $temp_dir/"$sample_name"_5P_plus.bedgraph \
-        -M $temp_dir/"$sample_name"_5P_minus.bedgraph \
-        -PO $temp_dir/5P_plus_mask.bedgraph \
-        -MO $temp_dir/5P_minus_mask.bedgraph \
+        -P $sample_dir/"$sample_name"_5P_plus.bedgraph \
+        -M $sample_dir/"$sample_name"_5P_minus.bedgraph \
+        -PO $sample_dir/5P_plus_mask.bedgraph \
+        -MO $sample_dir/5P_minus_mask.bedgraph \
         -U $resource_dir/5P_mask_up.bed \
         -L $resource_dir/length.table
     
     python $python_dir/bedgraph_mask.py \
-        -P $temp_dir/"$sample_name"_plus.uG.bedgraph \
-        -M $temp_dir/"$sample_name"_minus.uG.bedgraph \
-        -PO $temp_dir/uuG_plus_mask.bedgraph \
-        -MO $temp_dir/uuG_minus_mask.bedgraph \
+        -P $sample_dir/"$sample_name"_plus.uG.bedgraph \
+        -M $sample_dir/"$sample_name"_minus.uG.bedgraph \
+        -PO $sample_dir/uuG_plus_mask.bedgraph \
+        -MO $sample_dir/uuG_minus_mask.bedgraph \
         -U $resource_dir/5P_mask_up.bed \
         -L $resource_dir/length.table
 fi
 if [ $library_type == "3P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $temp_dir/"$sample_name"_3P_plus.bedgraph \
-        -M $temp_dir/"$sample_name"_3P_minus.bedgraph \
-        -PO $temp_dir/3P_plus_mask.bedgraph \
-        -MO $temp_dir/3P_minus_mask.bedgraph \
+        -P $sample_dir/"$sample_name"_3P_plus.bedgraph \
+        -M $sample_dir/"$sample_name"_3P_minus.bedgraph \
+        -PO $sample_dir/3P_plus_mask.bedgraph \
+        -MO $sample_dir/3P_minus_mask.bedgraph \
         -D $resource_dir/3P_mask_down.bed \
         -L $resource_dir/length.table
 fi
@@ -203,38 +203,38 @@ if [[ $library_type == "5P" ]]
 then
     if [[ $flip_5p == "true" ]]
     then
-        bg_plus=$temp_dir/BODY_minus.bedgraph
-        bg_minus=$temp_dir/BODY_plus.bedgraph
+        bg_plus=$sample_dir/BODY_minus.bedgraph
+        bg_minus=$sample_dir/BODY_plus.bedgraph
     else
-        bg_plus=$temp_dir/BODY_plus.bedgraph
-        bg_minus=$temp_dir/BODY_minus.bedgraph    
+        bg_plus=$sample_dir/BODY_plus.bedgraph
+        bg_minus=$sample_dir/BODY_minus.bedgraph    
     fi
 else
-    bg_plus=$temp_dir/BODY_plus.bedgraph
-    bg_minus=$temp_dir/BODY_minus.bedgraph
+    bg_plus=$sample_dir/BODY_plus.bedgraph
+    bg_minus=$sample_dir/BODY_minus.bedgraph
 fi
 
 
 python $python_dir/bedgraph_rescale.py \
-    -P $temp_dir/"$library_type"_plus_mask.bedgraph \
+    -P $sample_dir/"$library_type"_plus_mask.bedgraph \
     -N $bg_plus \
     -A $annotation_gff \
     -S + \
     --position $library_type \
     --align \
-    > $temp_dir/"$library_type"_scale_plus.txt
+    > $sample_dir/"$library_type"_scale_plus.txt
 
 python $python_dir/bedgraph_rescale.py \
-    -P $temp_dir/"$library_type"_minus_mask.bedgraph \
+    -P $sample_dir/"$library_type"_minus_mask.bedgraph \
     -N $bg_minus \
     -A $annotation_gff \
     -S - \
     --align \
     --position $library_type \
-    > $temp_dir/"$library_type"_scale_minus.txt
+    > $sample_dir/"$library_type"_scale_minus.txt
 
-plus_scales=( $(tail -n 1 $temp_dir/"$library_type"_scale_plus.txt) )
-minus_scales=( $(tail -n 1 $temp_dir/"$library_type"_scale_minus.txt) )
+plus_scales=( $(tail -n 1 $sample_dir/"$library_type"_scale_plus.txt) )
+minus_scales=( $(tail -n 1 $sample_dir/"$library_type"_scale_minus.txt) )
 scale=$(printf "%.2f" $(echo "(${plus_scales[0]} + ${minus_scales[0]}) / 2" | bc -l))
 bandwidth=$(printf "%.0f" $(echo "(${plus_scales[1]} + ${minus_scales[1]}) / 2" | bc -l))
 
@@ -250,25 +250,25 @@ then
     echo "hit bandwidth cap of $BANDWIDTH_CAP"
 fi
 
-unionBedGraphs -i $temp_dir/"$library_type"_plus_mask.bedgraph \
+unionBedGraphs -i $sample_dir/"$library_type"_plus_mask.bedgraph \
     $bg_plus \
-    > $temp_dir/tmp.bedgraph
+    > $sample_dir/tmp.bedgraph
 
 awk -v mult=$scale \
-    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-    > $temp_dir/"$library_type"_plus_subtract.bedgraph
+    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $sample_dir/tmp.bedgraph \
+    > $sample_dir/"$library_type"_plus_subtract.bedgraph
 
-unionBedGraphs -i $temp_dir/"$library_type"_minus_mask.bedgraph \
+unionBedGraphs -i $sample_dir/"$library_type"_minus_mask.bedgraph \
     $bg_minus \
-    > $temp_dir/tmp.bedgraph
+    > $sample_dir/tmp.bedgraph
 
 awk -v mult=$scale \
-    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $temp_dir/tmp.bedgraph \
-    > $temp_dir/"$library_type"_minus_subtract.bedgraph
+    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $sample_dir/tmp.bedgraph \
+    > $sample_dir/"$library_type"_minus_subtract.bedgraph
 
 
-echo $scale > $temp_dir/final_scaling_factors.tab
-rm $temp_dir/tmp.bedgraph
+echo $scale > $sample_dir/final_scaling_factors.tab
+rm $sample_dir/tmp.bedgraph
 
 ### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
 echo "#########################################################"
@@ -284,8 +284,8 @@ for strand in plus minus
 do
     kernel_density_command="python \
         $python_dir/bedgraph_kernel_density.py \
-        -B=$temp_dir/"$library_type"_"$strand"_subtract.bedgraph \
-        -O=$temp_dir/"$library_type"_"$strand"_smooth.bedgraph \
+        -B=$sample_dir/"$library_type"_"$strand"_subtract.bedgraph \
+        -O=$sample_dir/"$library_type"_"$strand"_smooth.bedgraph \
         -L=$resource_dir/length.table \
         -K=$KERNEL \
         -H=$bandwidth \
@@ -295,15 +295,15 @@ do
         -c $CPUS"
     echo $kernel_density_command
     eval $kernel_density_command
-    if [ ! -f $temp_dir/"$library_type"_"$strand"_smooth.bedgraph ]
+    if [ ! -f $sample_dir/"$library_type"_"$strand"_smooth.bedgraph ]
     then
         echo "ERROR: Failed to generate "$library_type"_"$strand"_smooth.bedgraph"
         exit 1
     fi
     feature_threshold_command="python \
     $python_dir/bedgraph_thresh_to_bed.py \
-    -B $temp_dir/"$library_type"_"$strand"_smooth.bedgraph \
-    -O $temp_dir/"$library_type"_"$strand"_features.bed \
+    -B $sample_dir/"$library_type"_"$strand"_smooth.bedgraph \
+    -O $sample_dir/"$library_type"_"$strand"_features.bed \
     -L $resource_dir/length.table \
     -T 0 \
     -M 10 \
@@ -311,7 +311,7 @@ do
     -S $strand"
     echo $feature_threshold_command
     eval $feature_threshold_command
-    if [ ! -f $temp_dir/"$library_type"_"$strand"_features.bed ]
+    if [ ! -f $sample_dir/"$library_type"_"$strand"_features.bed ]
     then
         echo "ERROR: Failed to generate "$library_type"_"$strand"_features.bed"
         exit 1
@@ -319,35 +319,35 @@ do
 done
 
 # Merges all end features identified in PHASE 3.4 to a single BED file.
-touch $temp_dir/end_features_temp.bed
-sed 's/thresh./'$library_type'.plus./' $temp_dir/"$library_type"_plus_features.bed \
-    >> $temp_dir/end_features_temp.bed
-sed 's/thresh./'$library_type'.minus./' $temp_dir/"$library_type"_minus_features.bed \
-    >> $temp_dir/end_features_temp.bed
+touch $sample_dir/end_features_temp.bed
+sed 's/thresh./'$library_type'.plus./' $sample_dir/"$library_type"_plus_features.bed \
+    >> $sample_dir/end_features_temp.bed
+sed 's/thresh./'$library_type'.minus./' $sample_dir/"$library_type"_minus_features.bed \
+    >> $sample_dir/end_features_temp.bed
 
-bedtools sort -i $temp_dir/end_features_temp.bed > $temp_dir/end_features.bed
+bedtools sort -i $sample_dir/end_features_temp.bed > $sample_dir/end_features.bed
 
 python $python_dir/bed_find_peaks.py \
-    -I $temp_dir/end_features.bed \
+    -I $sample_dir/end_features.bed \
     -L $resource_dir/length.table \
-    -O $temp_dir/$sample_name.rpm.features.bed \
-    -BP $temp_dir/"$library_type"_plus_mask.bedgraph \
-    -BM $temp_dir/"$library_type"_minus_mask.bedgraph \
+    -O $sample_dir/$sample_name.rpm.features.bed \
+    -BP $sample_dir/"$library_type"_plus_mask.bedgraph \
+    -BM $sample_dir/"$library_type"_minus_mask.bedgraph \
     -V rpm
 
-awk -F'[\t]' '{if ($5 >= .5){ print }}' $temp_dir/$sample_name.rpm.features.bed > $temp_dir/$sample_name.end_features.bed
+awk -F'[\t]' '{if ($5 >= .5){ print }}' $sample_dir/$sample_name.rpm.features.bed > $sample_dir/$sample_name.end_features.bed
 
-rm $temp_dir/end_features_temp.bed \
-    $temp_dir/end_features.bed \
-    $temp_dir/$sample_name.rpm.features.bed \
-    $temp_dir/"$library_type"_plus_features.bed \
-    $temp_dir/"$library_type"_minus_features.bed
-    $temp_dir/"$library_type"_plus_subtract.bedgraph \
-    $temp_dir/"$library_type"_minus_subtract.bedgraph
+rm $sample_dir/end_features_temp.bed \
+    $sample_dir/end_features.bed \
+    $sample_dir/$sample_name.rpm.features.bed \
+    $sample_dir/"$library_type"_plus_features.bed \
+    $sample_dir/"$library_type"_minus_features.bed
+    $sample_dir/"$library_type"_plus_subtract.bedgraph \
+    $sample_dir/"$library_type"_minus_subtract.bedgraph
 
 for strand in plus minus
 do
-    rm $temp_dir/"$library_type"_"$strand".bedgraph
+    rm $sample_dir/"$library_type"_"$strand".bedgraph
 done
 
 echo "Phase 3.4 complete."
