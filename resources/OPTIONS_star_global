@@ -3,7 +3,7 @@
 --alignMatesGapMax 11000 \
 --alignSJDBoverhangMin 1 \
 --alignSJoverhangMin 10 \
---outSJfilterOverhangMin -1 10 10 10 \
+--outSJfilterOverhangMin -1 15 15 15 \
 --outSJfilterCountTotalMin -1 2 2 2 \
 --outSJfilterCountUniqueMin -1 2 2 2 \
 --outFilterType BySJout \

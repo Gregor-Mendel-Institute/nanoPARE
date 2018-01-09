@@ -235,7 +235,7 @@ then
     if [ -z $adapters ]
     then
         echo "No adapter sequences specified. Skipping adapter trimming."
-        cat "$sample_name".1.fastq > "$sample_name"_adaptertrim.fastq
+        cat "$sample_name".1.fastq > "$sample_name"_trimmed.fastq
     elif [[ $number_of_adapters -eq 2 ]]
     then
         first_trim_command="cutadapt \
@@ -331,9 +331,9 @@ samtools view -h star/Aligned.out.bam > "$sample_name".sam
 if [[ $library_type == "5P" ]]
 then
     python $python_dir/readmapIO.py \
-        -S "$sample_name".5p \
+        -S "$sample_name" \
         -I "$sample_name".sam \
-        -R 5P \
+        -R $library_type \
         -F $genome_fasta \
         --softclip_type 5p \
         --untemp_out A C G T \
@@ -341,7 +341,7 @@ then
         --allow_naive
 else
     python $python_dir/readmapIO.py \
-        -S "$sample_name".5p \
+        -S "$sample_name" \
         -I "$sample_name".sam \
         -R $library_type \
         -F $genome_fasta \
@@ -352,21 +352,21 @@ fi
 
 rm "$sample_name".sam 
 
-bedtools sort -i "$sample_name".5p_"$library_type"_plus.bedgraph > "$sample_name"_plus.5p.bedgraph
-bedtools sort -i "$sample_name".5p_"$library_type"_minus.bedgraph > "$sample_name"_minus.5p.bedgraph
+bedtools sort -i "$sample_name"_"$library_type"_plus.bedgraph > "$sample_name"_plus.bedgraph
+bedtools sort -i "$sample_name"_"$library_type"_minus.bedgraph > "$sample_name"_minus.bedgraph
 
 if [[ $library_type == "5P" ]]
 then
-    bedtools sort -i "$sample_name".5p_"$library_type"_plus_untemp.bedgraph | \
+    bedtools sort -i "$sample_name"_"$library_type"_plus_untemp.bedgraph | \
         awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_plus.uG.bedgraph
-    bedtools sort -i "$sample_name".5p_"$library_type"_minus_untemp.bedgraph | \
+    bedtools sort -i "$sample_name"_"$library_type"_minus_untemp.bedgraph | \
         awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_minus.uG.bedgraph
     # Calculate transcript_level coverage by parsing the genome coverage values
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $annotation_subset \
         --output "$sample_name"_transcript.bedgraph \
-        "$sample_name"_plus.5p.bedgraph \
-        "$sample_name"_minus.5p.bedgraph \
+        "$sample_name"_plus.bedgraph \
+        "$sample_name"_minus.bedgraph \
         $annotation_gff \
         $genome_fasta
 else
@@ -374,15 +374,15 @@ else
     python $python_dir/bedgraph_genome_to_transcripts.py \
         --subset $annotation_subset \
         --output "$sample_name"_transcript.bedgraph \
-        "$sample_name"_minus.5p.bedgraph \
-        "$sample_name"_plus.5p.bedgraph \
+        "$sample_name"_minus.bedgraph \
+        "$sample_name"_plus.bedgraph \
         $annotation_gff \
         $genome_fasta
     
 fi
 
-rm "$sample_name".5p_"$library_type"_plus.bedgraph \
-    "$sample_name".5p_"$library_type"_minus.bedgraph
+rm "$sample_name"_"$library_type"_plus.bedgraph \
+    "$sample_name"_"$library_type"_minus.bedgraph
 
 # rm "$sample_name"*coverage.bedgraph
 
