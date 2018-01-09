@@ -110,7 +110,7 @@ output_folder=$results_dir/EndMask
 data_folder=$output_folder/$SAMPLE_NAME
 capped_features=$endclass_folder/$MASK_NAME/$MASK_NAME.capped.bed
 
-rm -R $data_folder
+rm -rf $data_folder
 mkdir -p $data_folder
 cd $data_folder
 
@@ -146,8 +146,8 @@ do
     # Perform cap masking on all 5' end bedgraphs (genome level)
     echo Capmasking: $s
     python $mask \
-        -P $endmap_folder/$s/"$s"_plus.5p.bedgraph \
-        -M $endmap_folder/$s/"$s"_minus.5p.bedgraph \
+        -P $endmap_folder/$s/"$s"_plus.bedgraph \
+        -M $endmap_folder/$s/"$s"_minus.bedgraph \
         -PO $data_folder/$s.capmask.plus.bedgraph \
         -MO $data_folder/$s.capmask.minus.bedgraph \
         -I $capped_features \
