@@ -150,8 +150,8 @@ cp $temp_dir/$body_name/"$body_name"_minus.bedgraph $sample_dir/BODY_minus.bedgr
 if [ $library_type == "5P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $sample_dir/"$sample_name"_5P_plus.bedgraph \
-        -M $sample_dir/"$sample_name"_5P_minus.bedgraph \
+        -P $sample_dir/"$sample_name"_plus.bedgraph \
+        -M $sample_dir/"$sample_name"_minus.bedgraph \
         -PO $sample_dir/5P_plus_mask.bedgraph \
         -MO $sample_dir/5P_minus_mask.bedgraph \
         -U $resource_dir/5P_mask_up.bed \
@@ -168,8 +168,8 @@ fi
 if [ $library_type == "3P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $sample_dir/"$sample_name"_3P_plus.bedgraph \
-        -M $sample_dir/"$sample_name"_3P_minus.bedgraph \
+        -P $sample_dir/"$sample_name"_plus.bedgraph \
+        -M $sample_dir/"$sample_name"_minus.bedgraph \
         -PO $sample_dir/3P_plus_mask.bedgraph \
         -MO $sample_dir/3P_minus_mask.bedgraph \
         -D $resource_dir/3P_mask_down.bed \
