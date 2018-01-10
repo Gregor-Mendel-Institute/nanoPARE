@@ -142,39 +142,24 @@ done
 
 echo "Bedgraph files +: "${plus_list[@]}
 echo "Bedgraph files -: "${minus_list[@]}
-bedtools unionbedg -i ${plus_list[@]} > combined_plus.bedgraph
-bedtools unionbedg -i ${minus_list[@]} > combined_minus.bedgraph
+python $python_dir/bedgraph_combine.py \
+    -i ${plus_list[@]} \
+    -o $sample_name.plus.bedgraph
 
-colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
-i=4
-sumstring='$4'
-while [ "$i" -lt "$colnum" ]
-do
-  i=$(($i + 1))
-  sumstring+='+$'$i
-done
-
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $sample_name.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $sample_name.minus.bedgraph
-rm combined_*us.bedgraph
+python $python_dir/bedgraph_combine.py \
+    -i ${minus_list[@]} \
+    -o $sample_name.minus.bedgraph
 
 echo "Bedgraph uuG files +: "${plus_list_uug[@]}
 echo "Bedgraph uuG files -: "${minus_list_uug[@]}
-bedtools unionbedg -i ${plus_list_uug[@]} > combined_plus.bedgraph
-bedtools unionbedg -i ${minus_list_uug[@]} > combined_minus.bedgraph
+python $python_dir/bedgraph_combine.py \
+    -i ${plus_list_uug[@]} \
+    -o $sample_name.uuG.plus.bedgraph
 
-colnum=$(head -n 1 combined_plus.bedgraph | awk '{print NF}')
-i=4
-sumstring='$4'
-while [ "$i" -lt "$colnum" ]
-do
-  i=$(($i + 1))
-  sumstring+='+$'$i
-done
+python $python_dir/bedgraph_combine.py \
+    -i ${minus_list_uug[@]} \
+    -o $sample_name.uuG.minus.bedgraph
 
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_plus.bedgraph > $sample_name.uuG.plus.bedgraph
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  combined_minus.bedgraph > $sample_name.uuG.minus.bedgraph
-rm combined_*us.bedgraph
 echo "Merged coverage files generated."
 
 # Merge all touching/overlapping features from all reps

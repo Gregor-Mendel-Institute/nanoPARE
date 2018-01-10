@@ -89,13 +89,6 @@ REQUIRED_MODULES=( --bedtools --python )
 . $bash_dir/load_modules.sh
 echo " "
 
-# 5P_PLUS=$resource_dir/5P_plus.bedgraph
-# 5P_MINUS=$resource_dir/5P_minus.bedgraph
-# 3P_PLUS=$resource_dir/3P_plus.bedgraph
-# 3P_MINUS=$resource_dir/3P_minus.bedgraph
-# BODY_PLUS=$resource_dir/BODY_plus.bedgraph
-# BODY_MINUS=$resource_dir/BODY_minus.bedgraph
-
 input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
 input_array=($input_mapper)
 
@@ -250,22 +243,15 @@ then
     echo "hit bandwidth cap of $BANDWIDTH_CAP"
 fi
 
-unionBedGraphs -i $sample_dir/"$library_type"_plus_mask.bedgraph \
-    $bg_plus \
-    > $sample_dir/tmp.bedgraph
+python $python_dir/bedgraph_combine.py \
+    -i $sample_dir/"$library_type"_plus_mask.bedgraph $bg_plus  \
+    -s $scale -1 \
+    -o $sample_dir/"$library_type"_plus_subtract.bedgraph
 
-awk -v mult=$scale \
-    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $sample_dir/tmp.bedgraph \
-    > $sample_dir/"$library_type"_plus_subtract.bedgraph
-
-unionBedGraphs -i $sample_dir/"$library_type"_minus_mask.bedgraph \
-    $bg_minus \
-    > $sample_dir/tmp.bedgraph
-
-awk -v mult=$scale \
-    '{printf $1"\t"$2"\t"$3"\t"$4*mult-$5"\n"}' $sample_dir/tmp.bedgraph \
-    > $sample_dir/"$library_type"_minus_subtract.bedgraph
-
+python $python_dir/bedgraph_combine.py \
+    -i $sample_dir/"$library_type"_minus_mask.bedgraph $bg_minus \
+    -s $scale -1 \
+    -o $sample_dir/"$library_type"_minus_subtract.bedgraph
 
 echo $scale > $sample_dir/final_scaling_factors.tab
 rm $sample_dir/tmp.bedgraph
