@@ -43,7 +43,7 @@ parser.add_argument(
 )
 parser.add_argument(
     '--minband', dest='minband', type=int,
-    help='minimum bandwidth', default=15
+    help='minimum bandwidth', default=12
 )
 parser.add_argument(
     '--position', dest='position', type=str,
