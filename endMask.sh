@@ -175,18 +175,7 @@ do
     rm $s.transcript.capmasked.bedgraph
     bedgraph_list+=( $s.transcript.bedgraph )
 done
-
-bedtools unionbedg -i ${bedgraph_list[@]} > $SAMPLE_NAME.merge.transcript.bedgraph
-
-colnum=$(head -n 1 $SAMPLE_NAME.merge.transcript.bedgraph | awk '{print NF}')
-i=4
-sumstring='$4'
-while [ "$i" -lt "$colnum" ]
-do
-  i=$(($i + 1))
-  sumstring+='+$'$i
-done
-
-awk '{printf $1"\t"$2"\t"$3"\t"'"$sumstring"'"\n"}'  $SAMPLE_NAME.merge.transcript.bedgraph > $SAMPLE_NAME.transcript.bedgraph
-rm $SAMPLE_NAME.merge.transcript.bedgraph
+python $python_dir/bedgraph_combine.py \
+    -i ${bedgraph_list[@]} \
+    -o $SAMPLE_NAME.transcript.bedgraph
 
