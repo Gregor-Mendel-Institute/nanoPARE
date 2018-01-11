@@ -1342,7 +1342,7 @@ if args.mmIO == "in":
                         if countvals[i] > 0:
                             if pos not in UNTEMP[s][chrom]:
                                 UNTEMP[s][chrom][pos] = {}
-                            UNTEMP[s][chrom][pos][multikey[i]] = UNTEMP[s][chrom][pos].get(multikey[i],0) + 1
+                            UNTEMP[s][chrom][pos][multikey[i]] = UNTEMP[s][chrom][pos].get(multikey[i],0) + countvals[i]
             
             input_file.close()
     
