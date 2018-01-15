@@ -114,8 +114,13 @@ mkdir -p $data_folder
 cd $data_folder
 
 echo "Setting up exon reference..."
+grep -P "exon\t" $annotation_gff | sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' | sed 's/Parent=\([^;]*\).*/\1/' > exons_by_transcript.gff
+python $python_dir/bed_deduplicate.py -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
+sed 's/\.[0-9]$//' terminal_exons_by_transcript.gff > terminal_exons_by_gene.gff
 grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\([^;\.]*\).*/\1/' > exons_by_gene.gff
-awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' exons_by_gene.gff > exons.bed
+
+awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' exons_by_gene.gff | bedtools sort > exons.bed
+awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' terminal_exons_by_gene.gff | bedtools sort > terminal_exons.bed
 
 ##################
 # MERGE FEATURES #
@@ -175,36 +180,96 @@ bedtools merge \
 grep -v -P '\t1\t' $sample_name.merged.bed \
     > $sample_name.rep.bed
 
-
 rm $sample_name.all.bed $sample_name.merged.bed
 
 bedfile=$sample_name.rep.bed
 
-# Locate the nearest (sense) gene in exons_by_gene.gff
-bedtools closest \
-    -s \
-    -D b \
-    -t first \
-    -a $bedfile \
-    -b exons_by_gene.gff \
-    > $sample_name.closest_gene.bed
-
-# Ath_chr1        310073  310434  Ath_chr1.636;Ath_chr1.672;Ath_chr1.652  3       +       Ath_chr1        TAIR10  exon    310316  310981  .       +       .       AT1G01900       0
-awk '{printf $1"\t"$2"\t"$3"\t5P."NR"\t"$16"\t"$6"\t"$15"\n"}' $sample_name.closest_gene.bed \
-    > $sample_name.gene.bed
-
-# Adding a merged peak position ot each replicable feature, keeping both the closest gene ID and distance
+# Adding a merged peak position to each replicable feature, keeping both the closest gene ID and distance
 python $python_dir/bed_find_peaks.py \
-    -I $sample_name.gene.bed \
-    -O $sample_name.all_features.bed \
+    -I $bedfile \
+    -O $sample_name.peaks.bed \
     -BP $sample_name.plus.bedgraph \
     -BM $sample_name.minus.bedgraph \
     -L $length_table \
     -V pass
 
-rm -f $sample_name.closest_gene.bed $sample_name.gene.bed
+bedtools sort -i $sample_name.peaks.bed | awk '{printf $1"\t"$2"\t"$3"\t5P."NR"\t"$5"\t"$6"\t"$7"\n"}' > $sample_name.rep_with_peaks.bed
+awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$7"\n" }' $sample_name.rep_with_peaks.bed > $sample_name.rep_only_peaks.bed
+rm $sample_name.peaks.bed
+
+
+# Heierarchically label each feature based on its relationship to reference:
+# PT (4 pts): peak position overlaps an annotated terminal exon
+# PI (3 pts): peak position overlaps an annotated internal exon
+# FT (2 pts): >=1nt of the feature overlaps an annotated terminal exon
+# FI (1 pt): >=1nt of the feature overlaps an annotated internal exon
+# O (0 pts): other peak, no overlap to any annotated genes
+
+bedfile=$sample_name.rep_only_peaks.bed
+bedtools closest \
+    -s -id \
+    -D b \
+    -t first \
+    -a $bedfile \
+    -b terminal_exons_by_gene.gff \
+    > $sample_name.PT.tmp.bed
+
+grep -P '\t0$' $sample_name.PT.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t4\n" }' > $sample_name.PT.bed
+rm $sample_name.PT.tmp.bed
+
+bedtools closest \
+    -s -id \
+    -D b \
+    -t first \
+    -a $bedfile \
+    -b exons_by_gene.gff \
+    > $sample_name.PI.tmp.bed
+
+grep -P '\t0$' $sample_name.PI.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t3\n" }' > $sample_name.PI.bed
+rm $sample_name.PI.tmp.bed
+
+bedfile=$sample_name.rep_with_peaks.bed
+bedtools closest \
+    -s -id \
+    -D b \
+    -t first \
+    -a $bedfile \
+    -b terminal_exons_by_gene.gff \
+    > $sample_name.FT.tmp.bed
+
+grep -P '\t0$' $sample_name.FT.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t2\n"}' > $sample_name.FT.bed
+rm $sample_name.FT.tmp.bed
+
+bedtools closest \
+    -s -id \
+    -D b \
+    -t first \
+    -a $bedfile \
+    -b exons_by_gene.gff \
+    > $sample_name.FI.tmp.bed
+
+grep -P '\t0$' $sample_name.FI.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t1\n"}' > $sample_name.FI.bed
+grep -v -P '\t0$' $sample_name.FI.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t0\n"}' > $sample_name.O.bed
+rm $sample_name.FI.tmp.bed
+
+# Collapse the decision tree into a single BED file, with each feature
+# represented by its highest-scoring match.
+cat $sample_name.PT.bed $sample_name.PI.bed $sample_name.FT.bed $sample_name.FI.bed $sample_name.O.bed | bedtools sort > $sample_name.gene.bed
+python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.bed \
+    | sed 's/\t0\t4$/\tPT/' \
+    | sed 's/\t0\t3$/\tPI/' \
+    | sed 's/\t0\t2$/\tFT/' \
+    | sed 's/\t0\t1$/\tFI/' \
+    | sed 's/\t0$//' \
+    | awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$8"\t"$6"\t"$5"\t"$7"\n" }' \
+    > $sample_name.all_features.bed
+
+rm -f $sample_name.PT.bed $sample_name.PI.bed $sample_name.FT.bed $sample_name.FI.bed $sample_name.O.bed $sample_name.gene.bed
 
 echo "Splitting capped and noncapped features..."
+
+# Expected input format for bed_uug_filter.py:
+# chromosome    start   stop    name    distance    strand  peak_location    closest_gene_ID
 
 python $python_dir/bed_uug_filter.py \
     -C $sample_name.capped.bed \
