@@ -1,17 +1,41 @@
 import logging
 import re
+from collections import defaultdict
 from abc import ABC, abstractmethod
+# import pandas as pd
 
 
 LOGGER = logging.getLogger('gff_utils')
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s')
-LOGGER.setLevel(20)
+# LOGGER.setLevel(20) setting logger level in the module is not recommended
 
+# TODO: check if this is accessible uppon import as module
 (CHROM_IDX, SOURCE_IDX, FEATURE_IDX, START_IDX, STOP_IDX, SCORE_IDX,
  STRAND_IDX, FRAME_IDX, ATTR_IDX) = range(0, 9)
 
 
-def parse_gff3(path):
+def parse_annotation(path, mode='dictionary'):
+    """Wrapper function that parses transcripts and exons from an annotation
+    file. The function checks the file extention (\'.gtf\' or \'.gff\') and
+    then decides how to proceed.
+
+    Args:
+        path (str): A file path.
+
+    Returns:
+        transcripts: A dictionary or a pandas data frame.
+
+    """
+    if path.lower().endswith('.gtf'):
+        return parse_gtf(path, mode)
+    elif path.lower().endswith('.gff'):
+        return parse_gff3(path, mode)
+    else:
+        raise ValueError('Invalid file type extention! Make sure the file ends'
+                         'with either \'.gtf\' or \'.gff\' (Case insensitive).')
+
+
+def parse_gff3(path, mode='dictionary'):
     """Wrapper function that parses transcripts and exons from a GFF3 file.
     Supports Ensemble, Gencode and TAIR files.
 
@@ -19,32 +43,32 @@ def parse_gff3(path):
         path (str): A file path
 
     Returns:
-        dict: A dictionary
+        transcripts: A dictionary or a pandas data frame.
 
     """
-    return get_file_content(path, 'gff3')
+    return get_file_content(path, 'gff3', mode)
 
 
-def parse_gtf(path):
+def parse_gtf(path, mode='dictionary'):
     """Wrapper function that parses transcripts and exons from a GTF file.
     Supports Ensemble, Gencode and TAIR files.
 
     Args:
-        path (str): A file path
+        path (str): A file path.
 
     Returns:
-        dict: A dictionary
+        transcripts: A dictionary or a pandas data frame.
 
     """
-    return get_file_content(path, 'gtf')
+    return get_file_content(path, 'gtf', mode)
 
 
 def check_file_type_args(file_type):
-    """Error handling function. Raises an expetion of a provided string is
+    """Error handling function. Raises an expetion if a provided string is
     neither 'gtf' or 'gff3'.
 
     Args:
-        file_type (str): A string describing the file_type
+        file_type (str): A string describing the file_type.
 
     Raises:
         ValueError
@@ -57,19 +81,72 @@ def check_file_type_args(file_type):
                          '\'gff3\'')
 
 
-def get_file_content(path, file_type):
+def get_grouped_transcripts(paths, file_type):
     """Function that processes and returns all transcripts contained in an
-    GFF3 or GTF file.
+    GFF3 or GTF file as a dictionary and groups them by an id key as returned
+    by 'transcript.get_bio_id()', which is a a summary of an identical intron
+    chain, strand and chromosome. Single exon transcripts will only be grouped
+    by strand and chromosome.
+
+    Args:
+        paths (iterable): An iterable containing file paths.
+        file_type (str): The type of annotation file ('gtf' or 'gff3').
+
+    Returns:
+        transcripts (defaultdict(list)): A dictionary mapping where transcripts
+            are grouped based on overlapping identiy.
+            E.g. key: transcript.get_bio_id(), value: transcript
+
+    """
+    # TODO implement auto file detection
+    # TODO implement pandas compability
+    # if mode not in {'dictionary', 'pandas'}:
+    #     raise ValueError('Invalid file mode selected! Select either'
+    #                      '\'dictionary\' or \'pandas\'')
+    #
+    # LOGGER.info('Parsing file: %s Return type: %s', path, mode)
+    # raise an error if someone tries to give undefined parameter values
+    check_file_type_args(file_type)
+    # get regex patterns for appropriate processing according to file type
+    patterns = get_regex_pattern(file_type)
+    # some containers to hold correct transcripts and orphaned subfeatures
+    # which can arise from an unsorted file
+    transcripts = defaultdict(list)
+    # get the file content
+    for path in paths:
+        with open(path) as fin:
+            # generator to skipp over not needed data and to make things neater
+            for transcript in process_lines(fin, patterns):
+                # add transcripts and exon features in propper hierarchy
+                transcripts[transcript.get_bio_id()].append(transcript)
+    return transcripts
+
+
+
+def get_file_content(path, file_type, mode='dictionary'):
+    """Function that processes and returns all transcripts contained in an
+    GFF3 or GTF file either as a dictionary or a pandas data frame.
 
     Args:
         path (str): A file path
-        file_type (str): The type of annotation file 'gtf' or 'gff3'
+        file_type (str): The type of annotation file ('gtf' or 'gff3').
+        mode (str): The return type of the data.
 
     Returns:
         transcripts (dictionary): A dictionary mapping transcript id to a
             Transcript class object.
 
+    Raises:
+        ValueError: Will be raised when the mode is neither 'dictionary' nor
+            'pandas'.
+
     """
+    # IDEA: maybe replace with a function that takes a set and a string
+    if mode not in {'dictionary', 'pandas'}:
+        raise ValueError('Invalid file mode selected! Select either'
+                         '\'dictionary\' or \'pandas\'')
+
+    LOGGER.info('Parsing file: %s Return type: %s', path, mode)
     # raise an error if someone tries to give undefined parameter values
     check_file_type_args(file_type)
     # get regex patterns for appropriate processing according to file type
@@ -83,7 +160,12 @@ def get_file_content(path, file_type):
         for transcript in process_lines(fin, patterns):
             # add transcripts and exon features in propper hierarchy
             transcripts[transcript.name] = transcript
-    return transcripts
+    if mode == 'dictionary':
+        return transcripts
+    if mode == 'pandas':
+        # temp_df = pd.DataFrame.from_dict(transcripts, orient='index')
+        return temp_df.rename(columns={0:'transcript'})
+
 
 
 def process_lines(lines, patterns):
@@ -262,14 +344,13 @@ def is_transcript(line):
         check (boolean): Boolean indicating if the line contains a transcript
 
     """
-    # TODO check if this are all possible indications of a transcript
+    # TODO check if this are all possible words denoting a transcript
     check_set = {'\ttranscript\t', '\tmrna\t'}
     checks = [s in line.lower() for s in check_set]
     return any(checks)
 
 
 def get_regex_pattern(file_type):
-    # TODO update docstring
     """Function returns a set of regex patterns to split and process either a
     gff3 or gtf formatted line.
 
@@ -308,13 +389,16 @@ def get_regex_pattern(file_type):
 
 
 def valid_attributes(cols, field_pattern, field_delimiter, line_number):
-    # TODO update docstring
     """Function that checks the validity of the gff/gtf attribute column.
 
     Args:
-        cols (list): A gtf3 or gff line split into different columns
-        pattern (re.pattern): Compiled regex pattern returned from
-            get_regex_pattern() to extract attribute values.
+        cols (list): A gtf3 or gff line split into different columns.
+        field_pattern (re.pattern): Compiled regex pattern returned from
+            get_regex_pattern() to extract the fields (key, value pairs)
+            in the attribute column.
+        field_delimiter (re.pattern): Compiled regex pattern returned from
+            get_regex_pattern() of the appropriate delimiter separating the
+            key, value pairs.
         line_number (int): Number of the line to check for loggin purposes.
 
     Returns:
@@ -370,6 +454,7 @@ class Feature(ABC):
         self.stop = data[STOP_IDX]
         self.attributes = data[ATTR_IDX]
 
+
     def get_attributes(self, file_type):
         """Method that generates a string from a key,value dictionary containing
         the genomic feature attributes (Column 9) in either as gtf or gff3 format.
@@ -397,14 +482,15 @@ class Feature(ABC):
             return '; '.join(attribs) + ';'
         if file_type == 'gff3':
             return ';'.join(attribs)
-    
-    
-    """Getter method to return the unique feature id. Needs to be implemented
-    by classes inherting from Feature.
-    """
+
+
     @abstractmethod
     def get_feature_id(self, attributes):
+        """Getter method to return the unique feature id. Needs to be
+        implemented by classes inherting from Feature.
+        """
         pass
+
 
 
 class Transcript(Feature):
@@ -425,6 +511,102 @@ class Transcript(Feature):
         self.exons = []
         self.exon_order = []
         self.number_exons = 0
+
+
+    def __eq__(self, other):
+        """Implentation of the comparison method. This method will compare the
+        intron chain of two transcripts. It should be rather seen as a
+        convienient way to compare the intron chain of two transcripts than a
+        ground truth comparion on the whole transcript. It does not require
+        exact matches of 5' and 3' ends of the fist and last exon. Returns true
+        when both transcripts have no introns.
+
+        Args:
+            other (Transcript): Another transcript of the class Transcript.
+
+        Retuns:
+            check (boolean): Boolean indicating matching or not matching
+                intron chains.
+
+        """
+        # transcripts can only be equal when located on the same strand and
+        # chromosome and have an identical splice junctions/intron chain.
+        if self.strand != other.strand:
+            return False
+        if self.chrom != other.chrom:
+            return False
+        if self.number_exons != other.number_exons:
+            return False
+        return self.compare_intron_chain(other)
+
+
+    def get_bio_id(self):
+        """Method that returns an id that is a summary of the strand,
+        chromosome and inner splice junction positions. This id can be used to
+        group similar transcripts for biological meaningful comparisons (e.g.
+        transcripts that share the same strand, chromosome and splice
+        junctions). However comparing Transcript objects should be done
+        by the '=='/'!=' operators or the compare_intron_chain method as this
+        is slightly faster.
+
+        Returns:
+            id (str): An id string summarizing the transcript properties.
+                Consists out of strand + chromosome + exon_start_positions
+                + exon_stop_positions without the outer end positions (e.g.
+                +Ath_chr198457989089780598605).
+
+        """
+
+        if self.number_exons != 1:
+            id_str_1 = ''.join(map(str, self.get_exon_start()[1:]))
+            id_str_2 = ''.join(map(str, self.get_exon_end()[:-1]))
+            return self.strand + self.chrom + id_str_1 + id_str_2
+        # FIXME not an ideal solution. Need to come up with a way how to
+        # deal with single exon transcripts
+        return self.strand + self.chrom + '_1_exon'
+
+
+    def compare_intron_chain(self, transcript, mode='full'):
+        """Method to compare the intron chain of this transcript with that from
+        another. This method only compares if the junctions share the same
+        positions. It can either compare the full chain (mode='full') or
+        check if another transcript is a super (mode='superset') or subset
+        (mode='subset')of this object. It does not require exact matches of 5'
+        and 3' ends of the fist and last exon. Returns true when both
+        transcripts have no introns.
+
+        Args:
+            transcript (Transcript): An object of the class Transcript.
+            mode (string): String indicating the type of check that should be
+                performed. Needs to be either'full', 'superset' or 'subset'.
+                Defaults to 'full'.
+
+        Returns:
+            check (boolean): Boolean indicating a failed or succcessfull check.
+
+        Raises:
+            ValueError: Raises an error when mode does not equal to either
+                'full', 'superset' or 'subset'.
+
+        """
+        exons_self = set(self.get_exon_start()[1:])
+        exons_self.update(self.get_exon_end()[:-1])
+
+        exons_other = set(transcript.get_exon_start()[1:])
+        exons_other.update(transcript.get_exon_end()[:-1])
+
+        if mode == 'full':
+            common = exons_self & exons_other
+            n_junctions = max(len(exons_self), len(exons_other))
+            return len(common) == n_junctions
+        elif mode == 'subset':
+            return exons_other.issubset(exons_self)
+        elif mode == 'superset':
+            return exons_other.issuperset(exons_self)
+        else:
+            raise ValueError('Invalid mode selected. Mode needs to be either'
+                             'equal to \'full\' or \'subset\'.')
+
 
     def add_exon(self, data):
         """Setter method to add exons that belong to a transript.
@@ -472,7 +654,7 @@ class Transcript(Feature):
         """
         return [self.exons[i].stop for i in self.exon_order]
 
-    def get_feature_id(self, attributes,verbose=False):
+    def get_feature_id(self, attributes, verbose=False):
         """Getter method that returns a unique feature id contained in the
         attributes ('ID' or 'transcript_id').
 
@@ -580,5 +762,5 @@ class Exon(Feature):
             return attributes['id']
         elif 'exon_id' in attributes:
             return attributes['exon_id']
-        else:
-            return 'exon:%s:%s' % (self.parent, self.exon_number)
+        return 'exon:%s:%s' % (self.parent, self.exon_number)
+
