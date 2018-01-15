@@ -214,6 +214,9 @@ def rc(sequence):
     """Returns reverse complement of a nucleotide string."""
     return ''.join(reversed([IUPACcomp[i] for i in sequence.upper()]))
 
+def complement(sequence):
+    """Returns complement of a nucleotide string."""
+    return ''.join([IUPACcomp[i] for i in sequence.upper()])
 
 def longest_orf(sequence,allow_truncation=True):
     """Locates the longest open reading frame.
