@@ -1145,10 +1145,10 @@ def generate_read_from_sam(input_lines,readtype=args.READTYPE,keep_seq=False):
         assert ID == generated_read.ID, 'ERROR: nonmatching IDs in input_lines:\n{}\t{}'.format(generated_read.ID,ID)
         
         attributes = dict([(':'.join(i.split(':')[0:2]),i.split(':')[-1]) for i in l[11:]])
-        Nmap = int(attributes['NH:i'])
-        if generated_read.Nmap == 0:
-            generated_read.Nmap = Nmap
-        assert Nmap == generated_read.Nmap, 'ERROR: inconsistent Nmap score for {}'.format(ID)
+        # Nmap = int(attributes['NH:i'])
+        # if generated_read.Nmap == 0:
+            # generated_read.Nmap = Nmap
+        # assert Nmap == generated_read.Nmap, 'ERROR: inconsistent Nmap score for {}'.format(ID)
         
         SAMflags   = bin(int(l[1]))[2:]
         SAMflags   = '0'*(12-len(SAMflags))+SAMflags
