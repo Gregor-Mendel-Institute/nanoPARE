@@ -153,6 +153,16 @@ do
         -I $capped_features \
         -L $length_table
     
+    # Generate dominant transcript-level unmasked bedgraphs
+    echo Converting to transcripts: $s
+    python $python_dir/bedgraph_genome_to_transcripts.py \
+        --subset $SAMPLE_NAME.dominant_transcript_lengths.tsv \
+        --output $s.transcript.unmasked.bedgraph \
+        $endmap_folder/$s/"$s"_plus.bedgraph \
+        $endmap_folder/$s/"$s"_minus.bedgraph \
+        $annotation_gff \
+        $genome_fasta
+    
     # Generate dominant transcript-level cap masked bedgraphs
     echo Converting to transcripts: $s
     python $python_dir/bedgraph_genome_to_transcripts.py \
