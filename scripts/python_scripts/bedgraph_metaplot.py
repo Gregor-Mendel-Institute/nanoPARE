@@ -2,12 +2,16 @@ import re
 import sys
 import argparse
 import gff_utils as gu
+import fasta_utils as fu
 import bedgraph_utils as bu
 
 ######################################################################
 parser = argparse.ArgumentParser()
 parser.add_argument('-A','--annotation',dest='ANNOTATION',
-                    help="Path to a reference annotation GTF/GFF.")
+                    help="Path to a reference annotation GTF/GFF.",
+                    required=True)
+parser.add_argument('-G','--genome',dest='GENOME',
+                    help="Path to a reference genome FASTA.")
 parser.add_argument("--subset", dest='SUBSET',
                     help="Subset of feature IDs to use from the annotation.", 
                     default=None, type=str)
@@ -21,8 +25,8 @@ parser.add_argument('-N',dest='NONSTRANDED_BEDGRAPH',
                     help="Path to nonstranded bedgraph file(s).",
                     default=[], nargs = '+')
 parser.add_argument('-F','--feature',dest='FEATURE',
-                    help="Feature type to use from the annotation",
-                    default='exon',type=str)
+                    help="Feature type to plot",
+                    default='transcript',choices=['CDS','transcript','5UTR','3UTR'],type=str)
 parser.add_argument('-V','--vertical',dest='VERTICAL',
                     help="Vertical normalization method",
                     default='norm',type=str)
@@ -47,6 +51,9 @@ parser.add_argument("--antisense", dest='ANTISENSE',
 parser.add_argument("--ns", dest='NONSTRANDED',
                     help="Reports nonstranded data.", 
                     default=False, action='store_true')
+parser.add_argument("--no_doubles", dest='NO_DOUBLES',
+                    help="Don't count any nucleotide more than once.", 
+                    default=False, action='store_true')
 args = parser.parse_args()
 ######################################################################
 
@@ -63,7 +70,16 @@ def notwhich(x,value=0):
 def flatten(list_of_lists):
     """Collapses a list/tuple of lists into a single list"""
     return [item for sublist in list_of_lists for item in sublist]
-    
+
+
+if args.GENOME:
+    genome = fu.import_genome(args.GENOME)
+else:
+    if args.FEATURE != 'transcript':
+        print("ERROR: cannot locate {} features without a reference genome.".format(args.FEATURE))
+        print("Provide genome FASTA file with -G")
+        sys.exit(1)
+
 coverage = None
 if args.PLUS_BEDGRAPH:
     for i in args.PLUS_BEDGRAPH:
@@ -134,6 +150,7 @@ if args.SUBSET:
 else:
     picked_IDs = ref_IDs
 
+signal_out = None
 for ID in picked_IDs:
     # Get feature attributes
     feature = ref_transcripts[ID]
@@ -141,8 +158,8 @@ for ID in picked_IDs:
     strand = feature.strand
     start = int(feature.start)
     end = int(feature.stop)
-    start = start - 1 - ADDLEN
-    end = end + ADDLEN
+    start = start - 1
+    end = end
     
     if args.SPLICE:
         exon_starts = feature.get_exon_start()
@@ -151,33 +168,69 @@ for ID in picked_IDs:
             print('# WARNING: inconsistent exon structure with {}'.format(ID))
             continue
         
-        exon_starts[0] = exon_starts[0] - ADDLEN
-        exon_ends[-1] = exon_ends[-1] + ADDLEN
         positions = flatten(
             [list(range(a - 1,b)) for a,b in zip(exon_starts,exon_ends)]
         )
     else:
         positions = list(range(start,end))
     
+    if strand == '-':
+        positions = positions[::-1]
+    
     length = len(positions)
+    if args.FEATURE != 'transcript':
+        sequence = ''.join([genome[chrom][i] for i in positions])
+        if strand == '-':
+            sequence = fu.complement(sequence)
+        
+        aa,ss,f = fu.longest_orf(sequence)
+        
+        ORFstart,ORFstop = ss
+        if args.FEATURE == '5UTR':
+            positions = positions[:ORFstart]
+        elif args.FEATURE == 'CDS':
+            positions = positions[ORFstart:ORFstop]
+        elif args.FEATURE == '3UTR':
+            positions = positions[ORFstop:]
+        
+    
+    if args.BUFFER:
+        if strand == '+':
+            positions = list(range(positions[0] - args.BUFFER, positions[0])) + positions + list(range(positions[-1] + 1, positions[-1] + 1 + args.BUFFER))
+        else:
+            positions = list(range(positions[0] + args.BUFFER, positions[0], -1)) + positions + list(range(positions[-1] - 1, positions[-1] - 1 - args.BUFFER, -1))
     
     if start < 0:
         continue
-    
+        
     if chrom in coverage['+']:
         values_plus = [coverage['+'][chrom].get(i,0) for i in positions]
+        if args.NO_DOUBLES:
+            for i in positions:
+                if i in coverage['+'][chrom]:
+                    coverage['+'][chrom][i] = 0
     else:
         values_plus = [0 for i in positions]
     
     if chrom in coverage['-']:
         values_minus = [coverage['-'][chrom].get(i,0) for i in positions]
+        if args.NO_DOUBLES:
+            for i in positions:
+                if i in coverage['-'][chrom]:
+                    coverage['-'][chrom][i] = 0
     else:
         values_minus = [0 for i in positions]
     
     if chrom in coverage['.']:
         values_ns = [coverage['.'][chrom].get(i,0) for i in positions]
+        if args.NO_DOUBLES:
+            for i in positions:
+                if i in coverage['.'][chrom]:
+                    coverage['.'][chrom][i] = 0
     else:
         values_ns = [0 for i in positions]
+    
+
     
     if args.NONSTRANDED:
         line_values = values_ns
@@ -191,9 +244,6 @@ for ID in picked_IDs:
             line_values = values_plus
         elif strand == '-':
             line_values = values_minus
-    
-    if strand == '-':
-        line_values = list(reversed(line_values))
     
     if args.VERTICAL == 'norm':
         norm_value  = float(max([abs(i) for i in line_values]))
@@ -229,6 +279,14 @@ for ID in picked_IDs:
             print('Error: center-align not yet implemented')
             sys.exit()
     featurecount+=1
+    if args.SIGNAL:
+        if not signal_out:
+            signal_out = open(args.SIGNAL,'w')
+        if sum(line_values) > 0:
+            signal_out.write('{}\n'.format(ID))
+
+if args.SIGNAL:
+    signal_out.close()
 
 if args.VERTICAL in ['mean','norm']:
     value_vector = [i/featurecount for i in value_vector]
