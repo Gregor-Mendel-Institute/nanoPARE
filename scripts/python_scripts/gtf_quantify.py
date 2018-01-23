@@ -35,9 +35,8 @@ parser.add_argument("--min_prior", dest='MIN_PRIOR',
                     help="Minimum nucleotide length to count \
                     as a prior.", default=20, type=int)
 parser.add_argument("--norm", dest='NORM',
-                    help="Number of allowed nonoverlapping terminal \
-                    nucleotides.", default='TPM', type=str,
-                    choices=['TPM','CPM','counts'])
+                    help="Normalization method(s).", default=['RPK','TPM'], type=str,
+                    nargs='+', choices=['TPM','reads','RPK','RPM','RPKgM','RPgM'])
 args = parser.parse_args()
 
 #################
@@ -278,6 +277,7 @@ print('# {} nonoverlapping loci'.format(
 # Populate a dictionary with quantification
 # values for each ID
 values = {}
+vlens = {}
 for chrom in overlap_groups.keys():
     for group in overlap_groups[chrom]:
         # Get the start/stop position of all
@@ -420,34 +420,74 @@ for chrom in overlap_groups.keys():
             if len(trash) == 0:
                 allow_naive = True
         
-        # Length-normalize priors if the output will be in TPM
-        if args.NORM in ['CPM','counts']:
-            for t in priors.keys():
-                priors[t] = priors[t] * t_lens[t]
+        # Convert priors back to total assigned reads
+        for p in priors.keys():
+            priors[p] = priors[p]*t_lens[p]
         
         if args.GENE:
             priors = convert_to_gene(priors)
+            new_t_lens = {}
+            for p in priors.keys():
+                new_t_lens[p] = 0
+                len_ids = [i for i in t_lens.keys() if p in i]
+                for li in len_ids:
+                    if t_lens[li] > new_t_lens[p]:
+                        new_t_lens[p] = t_lens[li]
+            t_lens = new_t_lens
+        
         
         values.update(priors)
+        vlens.update(t_lens)
         # for k,v in priors.items():
             # print('{}\t{}'.format(k,v))
 
+# Options for quantification output:
+# TPM   - Transcripts per Million (transcripts)
+# reads - Total reads (no normalization)
+# RPK   - Reads per kilobase
+# RPKgM - Reads per kb per million genome-matching reads
+# RPM   - Reads per million (transcript-matching reads)
+# RPgM  - Reads per million (genome-matching reads)
 
 if args.GENE:
     # Group all transcripts with the same prefix
     output_IDs = sorted(list(set([i.split('.')[0] for i in IDs])))
 else:
     output_IDs = IDs
-            
-if args.NORM == 'TPM':
-    vsum = sum(values.values())
-    
+
+# v_sum     - Total value of reads mapping to annotations
+# v_len_sum - Total per-kilobase-normalized value mapping to annotations
+
+v_sum = sum(values.values())
+v_len_sum = 0
+for k in values.keys():
+    # Calculate total reads/kb
+    v_len_sum += values[k] / vlens[k]*10**3
+
 for ID in output_IDs:
-    v = values.get(ID, 0)
-    if args.NORM == 'CPM':
-        v = round(v * 10**6 / total_readcount,2)
-    elif args.NORM == 'TPM':
-        v = round(v * 10**6 / vsum,2)
-    else:
-        v = round(v)
-    print('{}\t{}'.format(ID,v))
+    output_values = [ID]
+    for n in args.NORM:
+        v = values.get(ID, 0)
+        vlen = vlens.get(ID, 0)
+        if vlen == 0:
+            v = float(0)
+        else:
+            if n == 'RPgM':
+                out_v = round(v*10**6 / total_readcount,3)
+            elif n == 'RPKgM':
+                out_v = round(v*10**6 / total_readcount / vlen*10**3,3)
+            elif n == 'TPM':
+                out_v = round(v*10**6 / v_len_sum / vlen*10**3,3)
+                # out_v = round(v*10**6 / v_len_sum / vlen)
+            elif n == 'RPM':
+                out_v = round(v*10**6 / v_sum,3)
+            elif n == 'RPK':
+                out_v = round(v / vlen*10**3,3)
+                # out_v = round(v / vlen,3)
+            elif n == 'reads':
+                out_v = round(v,3)
+            else:
+                continue
+        
+        output_values += [str(out_v)]
+    print('\t'.join(output_values))

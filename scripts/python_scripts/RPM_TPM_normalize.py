@@ -12,7 +12,7 @@ parser.add_argument('-T','--tpm',dest='TPM',
                     help="Path to TPM table.",
                     required=True)
 parser.add_argument('-W','--winsorize',dest='WINSORIZE',
-                    help="Exclude outliers by examining the middle 90% of the data.",
+                    help="Exclude outliers by examining the middle 90 percent of the data.",
                     default=False, action='store_true')
 args = parser.parse_args()
 
@@ -20,12 +20,22 @@ rpm_vals = {}
 tpm_vals = {}
 
 for line in open(args.RPM):
+    if line[0] == '#':
+        continue
     l = line.rstrip().split()
-    rpm_vals[l[0]] = float(l[1])
+    raw = float(l[1])
+    norm = float(l[2])
+    if raw > 0 and norm > 0:
+        rpm_vals[l[0]] = raw / norm
 
 for line in open(args.TPM):
+    if line[0] == '#':
+        continue
     l = line.rstrip().split()
-    tpm_vals[l[0]] = float(l[1])
+    raw = float(l[1])
+    norm = float(l[2])
+    if raw > 0 and norm > 0:
+        tpm_vals[l[0]] = raw / norm
 
 ratios = []
 rpm_ids = set(list(rpm_vals.keys()))
