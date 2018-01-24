@@ -302,7 +302,7 @@ for chrom in overlap_groups.keys():
         # Make an array of edges, represented by a double of (start,end)
         all_edges = list(zip(all_nodes[:-1],all_nodes[1:]))
         t_lens = dict([(k,sum([b-a for a,b in v])) for k,v in node_dict.items()])
-
+        
         # Determine which IDs occupy each edge
         edge_assignment = {}
         for e in range(len(all_edges)):
@@ -358,7 +358,7 @@ for chrom in overlap_groups.keys():
                 priors[t] = priors.get(t,0) + edge_weight_p.get(e,0)
             elif transcripts[t].strand == '-':
                 priors[t] = priors.get(t,0) + edge_weight_m.get(e,0)
-        
+
         # Length-normalize priors
         tdel = []
         for t in priors.keys():
@@ -366,10 +366,11 @@ for chrom in overlap_groups.keys():
                 tdel += [t]
             else:
                 priors[t] = float(priors[t])/p_lens[t]
+
         for t in tdel:
             del priors[t]
             del p_lens[t]
-        
+
         # Update priors proportionally to the unique coverage
         unassigned_edges = [k for k,v in edge_assignment.items() if len(v) > 1]
         if not priors:
@@ -421,8 +422,8 @@ for chrom in overlap_groups.keys():
                 allow_naive = True
         
         # Convert priors back to total assigned reads
-        for p in priors.keys():
-            priors[p] = priors[p]*t_lens[p]
+        for p in t_lens.keys():
+            priors[p] = priors.get(p,0)*t_lens[p]
         
         if args.GENE:
             priors = convert_to_gene(priors)
@@ -466,11 +467,13 @@ for k in values.keys():
 
 for ID in output_IDs:
     output_values = [ID]
+    vlen = vlens.get(ID, 0)
+    v = values.get(ID, 0)
+    if vlen == 0:
+        v = float(0)
     for n in args.NORM:
-        v = values.get(ID, 0)
-        vlen = vlens.get(ID, 0)
         if vlen == 0:
-            v = float(0)
+            out_v = 0
         else:
             if n == 'RPgM':
                 out_v = round(v*10**6 / total_readcount,3)
@@ -489,7 +492,7 @@ for ID in output_IDs:
             elif n == 'reads':
                 out_v = round(v,3)
             else:
-                continue
+                out_v = 'NA'
         
         output_values += [str(out_v)]
     print('\t'.join(output_values))

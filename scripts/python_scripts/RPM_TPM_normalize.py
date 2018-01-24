@@ -11,44 +11,44 @@ parser.add_argument('-R','--rpm',dest='RPM',
 parser.add_argument('-T','--tpm',dest='TPM',
                     help="Path to TPM table.",
                     required=True)
-parser.add_argument('-W','--winsorize',dest='WINSORIZE',
-                    help="Exclude outliers by examining the middle 90 percent of the data.",
-                    default=False, action='store_true')
+parser.add_argument('-L','--length',dest='FRAGMENT_LENGTH',
+                    help="Mean fragment length of the sample.",
+                    default=200)
 args = parser.parse_args()
 
-rpm_vals = {}
-tpm_vals = {}
+# Calculate a conversion ratio to normalize the sequencing depth of
+# and end-specific library with that of a full-length library
 
-for line in open(args.RPM):
-    if line[0] == '#':
-        continue
-    l = line.rstrip().split()
-    raw = float(l[1])
-    norm = float(l[2])
-    if raw > 0 and norm > 0:
-        rpm_vals[l[0]] = raw / norm
+# total_effective_length is the sum total length (in nucleotides)
+# of a representative collection of 1 million transcripts laid end-to-end
+total_effective_length = 0
+total_BODY_reads = float(0)
+total_END_reads = float(0)
 
 for line in open(args.TPM):
     if line[0] == '#':
         continue
     l = line.rstrip().split()
     raw = float(l[1])
-    norm = float(l[2])
+    length = int(l[2])
+    norm = float(l[3])
     if raw > 0 and norm > 0:
-        tpm_vals[l[0]] = raw / norm
+        total_BODY_reads += raw
+        total_effective_length += length*norm
 
-ratios = []
-rpm_ids = set(list(rpm_vals.keys()))
-tpm_ids = set(list(tpm_vals.keys()))
+# BODY_population is the total number of fragments
+# that would be generated from a pool of 1 million transcripts
+BODY_population = total_effective_length/10**6/args.FRAGMENT_LENGTH
+END_BODY_ratio = 1 / BODY_population
 
-shared_ids = list(rpm_ids.intersection(tpm_ids))
-for i in shared_ids:
-    if rpm_vals[i] > 0 and tpm_vals[i] > 0:
-        ratios += [rpm_vals[i]/tpm_vals[i]]
+for line in open(args.RPM):
+    if line[0] == '#':
+        continue
+    l = line.rstrip().split()
+    raw = float(l[1])
+    length = int(l[2])
+    norm = float(l[3])
+    if raw > 0 and norm > 0:
+        total_END_reads += raw
 
-if args.WINSORIZE:
-    ratios.sort()
-    threshold = int(len(ratios)*0.05)
-    ratios = ratios[threshold:-threshold]
-
-print(float(sum(ratios))/len(ratios))
+print( END_BODY_ratio / (total_END_reads / total_BODY_reads))
