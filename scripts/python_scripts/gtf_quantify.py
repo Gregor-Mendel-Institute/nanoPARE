@@ -36,7 +36,7 @@ parser.add_argument("--min_prior", dest='MIN_PRIOR',
                     as a prior.", default=20, type=int)
 parser.add_argument("--norm", dest='NORM',
                     help="Normalization method(s).", default=['RPK','TPM'], type=str,
-                    nargs='+', choices=['TPM','reads','RPK','RPM','RPKgM','RPgM'])
+                    nargs='+', choices=['TPM','reads','length','RPK','RPM','RPKgM','RPgM'])
 args = parser.parse_args()
 
 #################
@@ -474,6 +474,8 @@ for ID in output_IDs:
         else:
             if n == 'RPgM':
                 out_v = round(v*10**6 / total_readcount,3)
+            elif n == 'length':
+                out_v = vlen
             elif n == 'RPKgM':
                 out_v = round(v*10**6 / total_readcount / vlen*10**3,3)
             elif n == 'TPM':
