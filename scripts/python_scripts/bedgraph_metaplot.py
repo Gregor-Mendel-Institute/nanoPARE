@@ -178,21 +178,31 @@ for ID in picked_IDs:
         positions = positions[::-1]
     
     length = len(positions)
+    
     if args.FEATURE != 'transcript':
         sequence = ''.join([genome[chrom][i] for i in positions])
         if strand == '-':
-            sequence = fu.complement(sequence)
-        
-        aa,ss,f = fu.longest_orf(sequence)
-        
-        ORFstart,ORFstop = ss
-        if args.FEATURE == '5UTR':
-            positions = positions[:ORFstart]
-        elif args.FEATURE == 'CDS':
-            positions = positions[ORFstart:ORFstop]
-        elif args.FEATURE == '3UTR':
-            positions = positions[ORFstop:]
-        
+            aa,ss,f = fu.longest_orf(fu.rc(sequence))
+            ORFstart,ORFstop = ss
+            if args.FEATURE == '5UTR':
+                positions = positions[-ORFstart:]
+            elif args.FEATURE == 'CDS':
+                positions = positions[-ORFstop:-ORFstart]
+            elif args.FEATURE == '3UTR':
+                positions = positions[:-ORFstop]
+        else:
+            aa,ss,f = fu.longest_orf(sequence)
+            ORFstart,ORFstop = ss
+            if args.FEATURE == '5UTR':
+                positions = positions[:ORFstart]
+            elif args.FEATURE == 'CDS':
+                positions = positions[ORFstart:ORFstop]
+            elif args.FEATURE == '3UTR':
+                positions = positions[ORFstop:]
+    
+    
+    if len(positions) == 0:
+        continue
     
     if args.BUFFER:
         if strand == '+':
@@ -232,9 +242,7 @@ for ID in picked_IDs:
     
 
     
-    if args.NONSTRANDED:
-        line_values = values_ns
-    elif args.ANTISENSE:
+    if args.ANTISENSE:
         if strand == '+':
             line_values = values_minus
         elif strand == '-':
@@ -244,6 +252,11 @@ for ID in picked_IDs:
             line_values = values_plus
         elif strand == '-':
             line_values = values_minus
+    if args.NONSTRANDED:
+        line_values = [a+b for a,b in zip(values_ns,line_values)]
+    
+    if not line_values:
+        continue
     
     if args.VERTICAL == 'norm':
         norm_value  = float(max([abs(i) for i in line_values]))

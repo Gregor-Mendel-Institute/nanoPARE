@@ -173,6 +173,19 @@ def flatten(list_of_lists):
     """Collapses a list/tuple of lists into a single list"""
     return [item for sublist in list_of_lists for item in sublist]
 
+def generate_kmers(length, type='DNA'):
+    """Generates an alphabetical array of kmers of a given length"""
+    if type == 'DNA':
+        characters = ['A','C','G','T']
+    else:
+        characters =  ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+    
+    if length == 1:
+        return characters
+    
+    else:
+        return flatten([[i+j for j in characters] for i in generate_kmers(length-1,type)])
+
 
 def import_genome(genome_FASTA, split_on=' ', keep_case=True):
     """Reads FASTA file to a dict."""

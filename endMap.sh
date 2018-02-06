@@ -60,7 +60,11 @@ if [ -z "$SETUP" ]
 then
     SETUP=false
 fi
-
+if [ -z "$BIAS" ]
+then
+    BIAS=false
+fi
+BIAS=true
 
 ############################
 # READING THE COMMAND LINE #
@@ -326,7 +330,74 @@ eval "STAR $star_params_allreads >& $sample_name.star.log"
 # rm "$sample_name".fastq
 
 echo Generating bedgraph files...
-samtools view -h star/Aligned.out.bam > "$sample_name".sam
+samtools view -H star/Aligned.out.bam | grep '@SQ' | sed 's/^@SQ\tSN://' | sed 's/\tLN:/\t/' > length.table
+
+if [[ $BIAS == "true" ]]
+then
+    samtools view -h star/Aligned.out.bam > full.unsorted.sam
+    python $python_dir/sam_subset.py \
+        -F $genome_fasta \
+        -A $annotation_gff \
+        -I full.unsorted.sam \
+        --feature CDS \
+        --unique > sub.unsorted.sam
+    samtools sort -O BAM -o sub.sorted.bam sub.unsorted.sam
+    samtools index sub.sorted.bam
+    samtools sort -O BAM -o full.sorted.bam full.unsorted.sam
+    samtools index full.sorted.bam
+    ##### Adapted from seqbias_pipe.sh ######
+    # Wang et al. (2017) BMC Bioinformatics
+    # https://github.com/txje/sequence-bias-adjustment
+    
+    # setup environment
+    bias_pipe=$root_dir/scripts/sequence-bias-adjustment
+    bias_outdir=$sample_dir/seqbias
+    k=4
+    mkdir -p $bias_outdir
+    bam=sub.sorted.bam
+    fullbam=full.sorted.bam
+    bamnpy=$bias_outdir/$sample_name.bam.npy
+    fullbamnpy=$bias_outdir/$sample_name.fullbam.npy
+    baseline=$bias_outdir/$sample_name.read_50_baseline.csv
+    kmer_bias=$bias_outdir/$sample_name.${k}mer_frequencies.csv
+    tile_cov=$bias_outdir/$sample_name.tile_covariance.npy
+    corrected_weights=$bias_outdir/$sample_name.${k}mer_adjusted.read_weights.npy
+    corrected_full_weights=$bias_outdir/$sample_name.${k}mer_adjusted.read_weights.full.npy
+    chroms=length.table
+    read_len=$(samtools view $bam | head -n 1 | awk '{print $10}' - | wc | awk '{print $3}' -)
+    if [ $read_len == 2 ]
+    then
+      read_len=20
+      echo "$sample_name read length adjusted to: $read_len"
+    fi
+    # convert bam to npy array
+    python $bias_pipe/bam2npy.py $bam $chroms $bamnpy
+    python $bias_pipe/bam2npy.py $fullbam $chroms $fullbamnpy
+    # compute nucleotide bias
+    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms 1 $bias_outdir/$sample_name.allele_frequencies.csv --read_len $read_len
+    # compute k-mer baseline
+    python $bias_pipe/compute_baseline.py $bamnpy $genome_fasta $chroms $k $baseline
+    # compute k-mer bias
+    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms $k $kmer_bias --read_len $read_len
+    # compute tile covariance matrix
+    python $bias_pipe/correlate_bias.py $bamnpy $genome_fasta $chroms $kmer_bias $tile_cov
+    # correct bias in subset
+    python $bias_pipe/correct_bias.py $bamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/$sample_name.${k}mer_adjusted.allele_frequencies.csv $corrected_weights $tile_cov --read_len $read_len
+    # compute corrected nucleotide bias
+    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.allele_frequencies.csv --read_len $read_len
+    # comput corrected k-mer bias
+    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len
+    # apply bias correction to full bam file
+    python $bias_pipe/correct_bias.py $fullbamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/$sample_name.full.${k}mer_adjusted.allele_frequencies.csv $corrected_full_weights $tile_cov --read_len $read_len
+    # output reweighted bam file (weights stored to XW tag)
+    python $bias_pipe/npy2bam.py $chroms $corrected_full_weights $fullbam full.adjusted.bam --tag
+    # resort adjusted bam file by read name
+    samtools view -h -n full.adjusted.bam > $sample_name.sam
+    # cleanup temp files
+    rm -f sub.sorted.bam sub.unsorted.sam full.unsorted.sam $bamnpy $fullbamnpy
+else
+    samtools view -h star/Aligned.out.bam > $sample_name.sam
+fi
 
 if [[ $library_type == "5P" ]]
 then

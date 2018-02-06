@@ -34,6 +34,9 @@ parser.add_argument("--buffer", dest='BUFFER',
 parser.add_argument("--min_prior", dest='MIN_PRIOR',
                     help="Minimum nucleotide length to count \
                     as a prior.", default=20, type=int)
+parser.add_argument("--end", dest='END',
+                    help="Which end to use as feature",
+                    default=None, choices=['5P','3P'])
 parser.add_argument("--norm", dest='NORM',
                     help="Normalization method(s).", default=['RPK','TPM'], type=str,
                     nargs='+', choices=['TPM','reads','length','RPK','RPM','RPKgM','RPgM'])
@@ -203,6 +206,22 @@ print('# {} reference transcripts: {}'.format(
     len(IDs),
     args.ANNOTATION
 ))
+new_transcripts = {}
+
+# Make a new annotation set, based exclusively on sites surrounding
+# the 5P or 3P end of a transcript
+
+# if args.END:
+    # if args.END == '5P':
+        # for id in IDs:
+            # strand = transcripts[id].strand
+            # if strand == '+':
+                # transcripts[id].stop = transcripts[id].start
+            # elif strand == '-':
+                # transcripts[id].start = transcripts[id].stop
+            
+        
+    
 
 # Construct a dictionary of leftmost->rightmost positions
 # for each transcript in the annotation file
