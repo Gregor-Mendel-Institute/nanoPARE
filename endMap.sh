@@ -83,7 +83,7 @@ echo "Config settings:"
 
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools --cutadapt --rna-star --samtools )
+REQUIRED_MODULES=( --bedtools --cutadapt --rna-star --samtools --pysam )
 . $bash_dir/load_modules.sh
 echo " "
 
