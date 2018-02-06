@@ -75,6 +75,11 @@ parser.add_argument(
     default=False
 )
 parser.add_argument(
+    "--weighted", dest='WEIGHTED', action='store_true',
+    help="If true, adjusts reads with weights from XW tag",
+    default=False
+)
+parser.add_argument(
     "--size_classes", dest='SIZE_CLASSES',
     help="(optional) outputs a table of read lengths per genome position 5' end",
     default=[], nargs='+'
@@ -298,8 +303,10 @@ def populate_bedgraphs(read_object,mmIO=args.mmIO):
         # Parse the mapping information of the uniquely mapping read
         chrom,strand,poslist = read_object.map_locations()[0]
         map_positions = set()
-        for pos,cigar,mate in poslist:
+        readweight = float(0)
+        for pos,cigar,mate,weight in poslist:
             mate_positions,junctions = get_mapping_positions(pos,cigar)
+            readweight += weight
             if junctions:
                 # TODO: Add to a splice junction dictionary
                 for j in junctions:
@@ -439,6 +446,7 @@ def populate_bedgraphs(read_object,mmIO=args.mmIO):
             mate_positions = set([i for i in mate_positions if i > 0 and i <= chromosomes[chrom]])
             map_positions.update(mate_positions)
         
+        readweight = readweight/len(poslist)
         if len(map_positions) > args.MINMATCH:
             if strand == '+':
                 ENDPOINT_end = min(map_positions) - 1
@@ -506,7 +514,7 @@ def populate_bedgraphs(read_object,mmIO=args.mmIO):
                                 min(temp_positions) - 1,
                                 max(temp_positions),
                                 'tmp',
-                                1,
+                                float(1)*readweight,
                                 strand,
                                 head_seq,
                                 temp_seq,
@@ -517,14 +525,14 @@ def populate_bedgraphs(read_object,mmIO=args.mmIO):
                     ) + '\n'
                 )
             
-            ENDPOINT[strand][chrom][ENDPOINT_end] = ENDPOINT[strand][chrom].get(ENDPOINT_end,0) + float(1)
+            ENDPOINT[strand][chrom][ENDPOINT_end] = ENDPOINT[strand][chrom].get(ENDPOINT_end,0) + float(1)*readweight
             if args.SIZE_CLASSES:
                 n = len(read_object.seq1)
                 if ENDPOINT_end not in READLENGTHS[strand][chrom]:
                     READLENGTHS[strand][chrom][ENDPOINT_end] = {}
-                READLENGTHS[strand][chrom][ENDPOINT_end][n] = READLENGTHS[strand][chrom][ENDPOINT_end].get(n,0) + float(1)
+                READLENGTHS[strand][chrom][ENDPOINT_end][n] = READLENGTHS[strand][chrom][ENDPOINT_end].get(n,0) + float(1)*readweight
             for pos in map_positions:
-                COVERAGE[strand][chrom][pos-1] = COVERAGE[strand][chrom].get(pos-1,0) + float(1)
+                COVERAGE[strand][chrom][pos-1] = COVERAGE[strand][chrom].get(pos-1,0) + float(1)*readweight
         if mmIO == "out":
             return 0
 
@@ -548,16 +556,20 @@ def assign_multimapper(
     
     mappos_list = []
     junction_list = []
+    weights_list = []
     for chrom,strand,poslist in all_mappings:
         allpositions = set()
         alljunctions = []
-        for p,c,m in poslist:
+        currentweight = 0
+        for p,c,m,w in poslist:
             positions, junctions = get_mapping_positions(p,c)
             allpositions.update(positions)
+            currentweight += w
             for j in junctions:
                 if j not in alljunctions:
                     alljunctions += [j]
-            
+        
+        weights_list += [currentweight/len(poslist)]
         mappos_list += [allpositions]
         junction_list += [alljunctions]
     
@@ -566,6 +578,8 @@ def assign_multimapper(
     all_mappings = [all_mappings[i] for i in which(long_enough)]
     
     mappos_list = [mappos_list[i] for i in which(long_enough)]
+    junction_list = [junction_list[i] for i in which(long_enough)]
+    weights_list = [weights_list[i] for i in which(long_enough)]
     chroms_list = [chrom for chrom,strand,poslist in all_mappings]
     strand_list = [strand for chrom,strand,poslist in all_mappings]
     poslist_list = [poslist for chrom,strand,poslist in all_mappings]
@@ -621,7 +635,7 @@ def assign_multimapper(
             #    N: Keep as untemplated
             for m in range(len(poslist_list[i])):
                 untemp_positions = set()
-                pos,cigar,mate = poslist_list[i][m]
+                pos,cigar,mate,weight = poslist_list[i][m]
                 softclip_positions = None
                 if current_strand == '+':
                     if mate == 1:
@@ -811,7 +825,7 @@ def assign_multimapper(
                             min(temp_positions) - 1,
                             max(temp_positions),
                             'tmp',
-                            float(value)*proportions[i],
+                            float(value)*proportions[i]*weights_list[i],
                             strand_list[i],
                             head_seq,
                             temp_seq,
@@ -828,11 +842,11 @@ def assign_multimapper(
             for j in junctions:
                 jstrand = get_junction_strand(j,chroms_list[i])
                 SJ[jstrand][chrom][j] = SJ[jstrand][chrom].get(j,0) + \
-                    float(value)*proportions[i]
+                    float(value)*proportions[i]*weights_list[i]
         
         ENDPOINT[strand_list[i]][chroms_list[i]][ENDPOINT_end] = \
             ENDPOINT[strand_list[i]][chroms_list[i]].get(ENDPOINT_end,0) + \
-            float(value)*proportions[i]
+            float(value)*proportions[i]*weights_list[i]
         
         if args.SIZE_CLASSES:
             n = len(read_object.seq1)
@@ -840,12 +854,12 @@ def assign_multimapper(
                 READLENGTHS[strand_list[i]][chroms_list[i]][ENDPOINT_end] = {}
             READLENGTHS[strand_list[i]][chroms_list[i]][ENDPOINT_end][n] = \
                 READLENGTHS[strand_list[i]][chroms_list[i]][ENDPOINT_end].get(n,0) + \
-                float(value)*proportions[i]
+                float(value)*proportions[i]*weights_list[i]
         
         for pos in mappos_list[i]:
             COVERAGE[strand_list[i]][chroms_list[i]][pos-1] = \
                 COVERAGE[strand_list[i]][chroms_list[i]].get(pos-1,0) + \
-                float(value)*proportions[i]
+                float(value)*proportions[i]*weights_list[i]
         
         # Update the UNTEMP dict with the correct location and identity of untemplated nucleotides
         if i in untemp_dict:
@@ -856,7 +870,7 @@ def assign_multimapper(
                 
                 UNTEMP[strand_list[i]][chroms_list[i]][u_pos][n] = \
                     UNTEMP[strand_list[i]][chroms_list[i]][u_pos].get(n,0) + \
-                    float(value)*proportions[i]
+                    float(value)*proportions[i]*weights_list[i]
 
 
 def run_mm_assignment(multiplicity):
@@ -1145,6 +1159,11 @@ def generate_read_from_sam(input_lines,readtype=args.READTYPE,keep_seq=False):
         assert ID == generated_read.ID, 'ERROR: nonmatching IDs in input_lines:\n{}\t{}'.format(generated_read.ID,ID)
         
         attributes = dict([(':'.join(i.split(':')[0:2]),i.split(':')[-1]) for i in l[11:]])
+        if args.WEIGHTED:
+            weight = float(attributes.get('XW:f',1))
+        else:
+            weight = float(1)
+        
         # Nmap = int(attributes['NH:i'])
         # if generated_read.Nmap == 0:
             # generated_read.Nmap = Nmap
@@ -1215,27 +1234,27 @@ def generate_read_from_sam(input_lines,readtype=args.READTYPE,keep_seq=False):
         if first_in_pair or not is_paired:
             if secondary or supplementary:
                 if pos in generated_read.secondary:
-                    generated_read.secondary[pos][2].append((pos,cigar,1))
+                    generated_read.secondary[pos][2].append((pos,cigar,1,weight))
                 else:
-                    generated_read.secondary[pos] = [chrom,strand,[(pos,cigar,1)]]
+                    generated_read.secondary[pos] = [chrom,strand,[(pos,cigar,1,weight)]]
             else:
                 if pos in generated_read.primary:
-                    generated_read.primary[pos][2].append((pos,cigar,1))
+                    generated_read.primary[pos][2].append((pos,cigar,1,weight))
                 else:
-                    generated_read.primary[pos] = [chrom,strand,[(pos,cigar,1)]]
+                    generated_read.primary[pos] = [chrom,strand,[(pos,cigar,1,weight)]]
         else:
             if not pair_is_mapped:
                 continue
             if secondary or supplementary:
                 if pairpos in generated_read.secondary:
-                    generated_read.secondary[pairpos][2].append((pos,cigar,2))
+                    generated_read.secondary[pairpos][2].append((pos,cigar,2,weight))
                 else:
-                    generated_read.secondary[pairpos] = [chrom,strand,[(pos,cigar,2)]]
+                    generated_read.secondary[pairpos] = [chrom,strand,[(pos,cigar,2,weight)]]
             else:
                 if pairpos in generated_read.primary:
-                    generated_read.primary[pairpos][2].append((pos,cigar,2))
+                    generated_read.primary[pairpos][2].append((pos,cigar,2,weight))
                 else:
-                    generated_read.primary[pairpos] = [chrom,strand,[(pos,cigar,2)]]
+                    generated_read.primary[pairpos] = [chrom,strand,[(pos,cigar,2,weight)]]
     
     return generated_read
 
