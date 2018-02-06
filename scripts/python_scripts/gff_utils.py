@@ -568,7 +568,11 @@ class Transcript(Feature):
     """
     def __init__(self, data):
         # initilize the Feature super class and inherit from it.
-        super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        if sys.version_info[0] > 2:
+            super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        else:
+            super(Feature, self).__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        
         # initilize variables and fill with some data
         self.chrom = data[CHROM_IDX]
         self.source = data[SOURCE_IDX]
@@ -786,7 +790,10 @@ class Exon(Feature):
     def __init__(self, data, exon_number):
         self.parent = self.get_parent(data[ATTR_IDX])
         self.exon_number = exon_number
-        super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        if sys.version_info[0] > 2:
+            super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        else:
+            super(Feature, self).__init__(data, self.get_feature_id(data[ATTR_IDX]))
 
     def get_parent(self, attributes):
         """Getter method that returns a the parent id (transcript id) of an
