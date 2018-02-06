@@ -1,7 +1,12 @@
 import logging
 import re
 from collections import defaultdict
-from abc import ABC, abstractmethod
+import sys
+if sys.version_info[0] > 2:
+    from abc import ABC, abstractmethod
+else:
+    from abc import ABCMeta, abstractmethod
+
 # import pandas as pd
 
 
@@ -434,62 +439,121 @@ def write_to_file(file_name, file_type, features):
 
 
 # TODO: Add docsting for the classes and methods
-class Feature(ABC):
-    """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
-    Implements most of the attributes of a genomic feature that are different
-    for each type of feature. Class Transript and Exon inherit from it.
-
-    Args:
-        data (list): Columns of gff3/gtf line
-        feature_id (str): A string holding a unique identifier.
-
-    """
-    def __init__(self, data, feature_id):
-        # initilize variables and fill with some data
-        self.name = feature_id
-        self.score = data[SCORE_IDX]
-        self.strand = data[STRAND_IDX]
-        self.phase = data[FRAME_IDX]
-        self.start = data[START_IDX]
-        self.stop = data[STOP_IDX]
-        self.attributes = data[ATTR_IDX]
-
-
-    def get_attributes(self, file_type):
-        """Method that generates a string from a key,value dictionary containing
-        the genomic feature attributes (Column 9) in either as gtf or gff3 format.
-        Can be used for converting between file formats and printing.
+if sys.version_info[0] > 2:
+    class Feature(ABC):
+        """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
+        Implements most of the attributes of a genomic feature that are different
+        for each type of feature. Class Transript and Exon inherit from it.
 
         Args:
-            file_type (str): String indicating format that should be returned.
-                Needs to be either 'gff3' or 'gtf'.
-
-        Returns:
-            attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
-                in gff3 or gtf format.
+            data (list): Columns of gff3/gtf line
+            feature_id (str): A string holding a unique identifier.
 
         """
-        # The attribute colum consists out of key value pairs sitting in
-        # dictionary. This loop glues them back together with the appropriate
-        # file delimiter
-        attribs = []
-        for key, value in self.attributes.items():
+        def __init__(self, data, feature_id):
+            # initilize variables and fill with some data
+            self.name = feature_id
+            self.score = data[SCORE_IDX]
+            self.strand = data[STRAND_IDX]
+            self.phase = data[FRAME_IDX]
+            self.start = data[START_IDX]
+            self.stop = data[STOP_IDX]
+            self.attributes = data[ATTR_IDX]
+
+
+        def get_attributes(self, file_type):
+            """Method that generates a string from a key,value dictionary containing
+            the genomic feature attributes (Column 9) in either as gtf or gff3 format.
+            Can be used for converting between file formats and printing.
+
+            Args:
+                file_type (str): String indicating format that should be returned.
+                    Needs to be either 'gff3' or 'gtf'.
+
+            Returns:
+                attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
+                    in gff3 or gtf format.
+
+            """
+            # The attribute colum consists out of key value pairs sitting in
+            # dictionary. This loop glues them back together with the appropriate
+            # file delimiter
+            attribs = []
+            for key, value in self.attributes.items():
+                if file_type == 'gtf':
+                    attribs.append(' '.join((key, '"' + value + '"')))
+                if file_type == 'gff3':
+                    attribs.append('='.join((key, value)))
             if file_type == 'gtf':
-                attribs.append(' '.join((key, '"' + value + '"')))
+                return '; '.join(attribs) + ';'
             if file_type == 'gff3':
-                attribs.append('='.join((key, value)))
-        if file_type == 'gtf':
-            return '; '.join(attribs) + ';'
-        if file_type == 'gff3':
-            return ';'.join(attribs)
+                return ';'.join(attribs)
 
 
-    @abstractmethod
-    def get_feature_id(self, attributes):
-        """Getter method to return the unique feature id. Needs to be
-        implemented by classes inherting from Feature.
+        @abstractmethod
+        def get_feature_id(self, attributes):
+            """Getter method to return the unique feature id. Needs to be
+            implemented by classes inherting from Feature.
+            """
+            pass
+else:
+    class Feature:
+        """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
+        Implements most of the attributes of a genomic feature that are different
+        for each type of feature. Class Transript and Exon inherit from it.
+
+        Args:
+            data (list): Columns of gff3/gtf line
+            feature_id (str): A string holding a unique identifier.
+
         """
-        pass
+        __metaclass__ = ABCMeta
+        def __init__(self, data, feature_id):
+            # initilize variables and fill with some data
+            self.name = feature_id
+            self.score = data[SCORE_IDX]
+            self.strand = data[STRAND_IDX]
+            self.phase = data[FRAME_IDX]
+            self.start = data[START_IDX]
+            self.stop = data[STOP_IDX]
+            self.attributes = data[ATTR_IDX]
+
+
+        def get_attributes(self, file_type):
+            """Method that generates a string from a key,value dictionary containing
+            the genomic feature attributes (Column 9) in either as gtf or gff3 format.
+            Can be used for converting between file formats and printing.
+
+            Args:
+                file_type (str): String indicating format that should be returned.
+                    Needs to be either 'gff3' or 'gtf'.
+
+            Returns:
+                attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
+                    in gff3 or gtf format.
+
+            """
+            # The attribute colum consists out of key value pairs sitting in
+            # dictionary. This loop glues them back together with the appropriate
+            # file delimiter
+            attribs = []
+            for key, value in self.attributes.items():
+                if file_type == 'gtf':
+                    attribs.append(' '.join((key, '"' + value + '"')))
+                if file_type == 'gff3':
+                    attribs.append('='.join((key, value)))
+            if file_type == 'gtf':
+                return '; '.join(attribs) + ';'
+            if file_type == 'gff3':
+                return ';'.join(attribs)
+
+
+        @abstractmethod
+        def get_feature_id(self, attributes):
+            """Getter method to return the unique feature id. Needs to be
+            implemented by classes inherting from Feature.
+            """
+            pass
 
 
 
