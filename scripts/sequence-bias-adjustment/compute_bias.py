@@ -20,15 +20,15 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, read_limit, clip,
   CHROMS = [c.split()[0] for c in open(chrom_file).read().strip().split('\n')]
 
   if not bam_npy_file[-4:] == ".npy":
-    print("BAM file must be in .bam.npy format.")
+    print "BAM file must be in .bam.npy format."
     return
 
-  print("Loading BAM file...")
+  print "Loading BAM file..."
   bam = numpy.load(bam_npy_file)
   fa = pysam.Fastafile(fasta_file)
-  kmer_counts = [{kmer:0 for kmer in make_kmers(k)} for i in range(margin * 2 + 1)]
+  kmer_counts = [{kmer:0 for kmer in make_kmers(k)} for i in xrange(margin * 2 + 1)]
   num_reads = 0
-  print("Reading ref seq...")
+  print "Reading ref seq..."
   refs = [fa.fetch(chr).upper() for chr in CHROMS]
 
   # keep track of how many reads are at each pos
@@ -36,13 +36,13 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, read_limit, clip,
   num_at_pos = 0
   over_limit = 0
 
-  print("Processing %i reads..." % len(bam))
+  print "Processing %i reads..." % len(bam)
   for read in bam:
     if read_limit != None and num_reads >= read_limit:
       break
     num_reads += 1
     if num_reads % 10**6 == 0:
-      print(num_reads)
+      print num_reads
 
     # keep track of how many reads are at each pos
     if read[1] == last_pos:
@@ -76,28 +76,28 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, read_limit, clip,
       #print read, "seq is too short:", len(seq), "should be", (margin * 2 + 1)
       pass
     if k > 1:
-      for i in range(min(margin * 2 - k + 2, len(seq)-k+1)):
+      for i in xrange(min(margin * 2 - k + 2, len(seq)-k+1)):
         kmer = seq[i:i+k]
-        if 'N' in kmer or kmer not in kmer_counts[i]:
+        if 'N' in kmer or not kmer_counts[i].has_key(kmer):
           continue
         kmer_counts[i][kmer] += weight
     else:
-      for i in range(min(margin * 2 + 1, len(seq))):
-        if seq[i] == 'N' or seq[i] not in kmer_counts[i]:
+      for i in xrange(min(margin * 2 + 1, len(seq))):
+        if seq[i] == 'N' or not kmer_counts[i].has_key(seq[i]):
           continue
         kmer_counts[i][seq[i]] += weight
 
-  print("%i reads done." % num_reads)
+  print "%i reads done." % num_reads
   if MAX_AT_POS is not None:
-    print("%i positions with >%i reads" % (over_limit, MAX_AT_POS))
+    print "%i positions with >%i reads" % (over_limit, MAX_AT_POS)
 
-  kmers = list(set([key for kmers in kmer_counts for key in list(kmers.keys()) if 'N' not in key and len(key) == k]))
+  kmers = list(set([key for kmers in kmer_counts for key in kmers.keys() if 'N' not in key and len(key) == k]))
   if len(kmers[0]) == 1:
     kmers = 'ACGT'
-  total_reads_used = sum([float(kmer_counts[0][k] if k in kmer_counts[0] else 0) for k in kmers])
+  total_reads_used = sum([float(kmer_counts[0][k] if kmer_counts[0].has_key(k) else 0) for k in kmers])
   fout = open(output_file, 'w')
   fout.write(',' + ','.join(kmers) + "\n")
-  fout.write('\n'.join('%i,' % (a-margin) + ','.join(['%.8f' % (float(kmer_counts[a][k] if k in kmer_counts[a] else 0)/total_reads_used) for k in kmers]) for a in range(len(kmer_counts))))
+  fout.write('\n'.join('%i,' % (a-margin) + ','.join(['%.8f' % (float(kmer_counts[a][k] if kmer_counts[a].has_key(k) else 0)/total_reads_used) for k in kmers]) for a in xrange(len(kmer_counts))))
   fout.close()
 
 if __name__ == "__main__":

@@ -152,10 +152,10 @@ then
 # ---------------------------------------------------------
 # various plots, results, diagnostics
 #
-  # echo [$(timestamp)] start: Plot adjusted nucleotide frequencies
-  # python plot_csv.py $outdir/$prefix.allele_frequencies.csv --out $outdir/$prefix.allele_frequencies.png
-  # python plot_csv.py $outdir/$prefix.${k}mer_adjusted.allele_frequencies.csv --out $outdir/$prefix.${k}mer_adjusted.allele_frequencies.png
-  # echo [$(timestamp)] end: Plot adjusted nucleotide frequencies
+  echo [$(timestamp)] start: Plot adjusted nucleotide frequencies
+  python plot_csv.py $outdir/$prefix.allele_frequencies.csv --out $outdir/$prefix.allele_frequencies.png
+  python plot_csv.py $outdir/$prefix.${k}mer_adjusted.allele_frequencies.csv --out $outdir/$prefix.${k}mer_adjusted.allele_frequencies.png
+  echo [$(timestamp)] end: Plot adjusted nucleotide frequencies
 #
 # elsewhere:
 # - Compute and plot TFBS bias (before and after correction)

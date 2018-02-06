@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 from matplotlib import pyplot
 import pysam
 
-CHROMS = ['chr%i' % i for i in range(1,23)] + ['chrX']
+CHROMS = ['chr%i' % i for i in xrange(1,23)] + ['chrX']
 READ_LEN = 20
 MARGIN = 5
 CHROM_LENS = {"chr1": 249250621, "chr2": 243199373, "chr3": 198022430, "chr4": 191154276, "chr5": 180915260, "chr6": 171115067, "chr7": 159138663, "chr8": 146364022, "chr9": 141213431, "chr10": 135534747, "chr11": 135006516, "chr12": 133851895, "chr13": 115169878, "chr14": 107349540, "chr15": 102531392, "chr16": 90354753, "chr17": 81195210, "chr18": 78077248, "chr19": 59128983, "chr20": 63025520, "chr21": 48129895, "chr22": 51304566, "chrX": 155270560, "chrY": 59373566}
@@ -14,7 +14,7 @@ CHROM_LENS = {"chr1": 249250621, "chr2": 243199373, "chr3": 198022430, "chr4": 1
 
 def main(bamfile, outfile, stdout, npyfile, plotfile, dostats, read_len, chromosome, query_start, query_end, clip):
   if not stdout:
-    print("Loading reads...")
+    print "Loading reads..."
   bam = pysam.AlignmentFile(bamfile, "rb")
 
   if not stdout:
@@ -33,10 +33,10 @@ def main(bamfile, outfile, stdout, npyfile, plotfile, dostats, read_len, chromos
 
     c = CHROMS.index(chrom)
     if not stdout:
-      print(chrom)
+      print chrom
 
     if not stdout:
-      print("Computing pileups...")
+      print "Computing pileups..."
     read_count = 0
     for read in bam.fetch(chrom):
       if read_count == 0:
@@ -55,7 +55,7 @@ def main(bamfile, outfile, stdout, npyfile, plotfile, dostats, read_len, chromos
         break
       i += 1
     if not stdout:
-      print("%i reads" % read_count)
+      print "%i reads" % read_count
 
     if not stdout:
       pileups.append(pileup)
@@ -67,10 +67,10 @@ def main(bamfile, outfile, stdout, npyfile, plotfile, dostats, read_len, chromos
   total_pileup = numpy.concatenate(pileups)
 
   if dostats:
-    print("Range: %i - %i" % (total_pileup.min(), total_pileup.max()))
-    print("Median: %i" % numpy.median(total_pileup))
-    print("Mean: %i" % numpy.mean(total_pileup))
-    print("Mode: %i" % stats.mode(total_pileup)[0][0])
+    print "Range: %i - %i" % (total_pileup.min(), total_pileup.max())
+    print "Median: %i" % numpy.median(total_pileup)
+    print "Mean: %i" % numpy.mean(total_pileup)
+    print "Mode: %i" % stats.mode(total_pileup)[0][0]
 
   if plotfile or npyfile:
     hist = numpy.histogram(total_pileup, bins=total_pileup.max())
@@ -94,23 +94,23 @@ def main(bamfile, outfile, stdout, npyfile, plotfile, dostats, read_len, chromos
     fout = open(outfile, 'w')
     fout.write("position,reads")
     for pileup in pileups:
-      for p in range(len(pileup)):
+      for p in xrange(len(pileup)):
         fout.write(format % (p + start, pileup[p]))
     fout.close()
   elif outfile[-3:] == "wig":
     fout = open(outfile, 'w')
-    for c in range(len(pileups)):
+    for c in xrange(len(pileups)):
       pileup = pileups[c]
       chrom = CHROMS[c] if chromosome == None else chromosome
       if c != 0:
         fout.write("\n")
       fout.write("fixedStep chrom=%s start=%i step=1" % (chrom, start))
-      for p in range(len(pileup)):
+      for p in xrange(len(pileup)):
         fout.write(format % pileup[p])
         #fout.write(format % (pileup[p] if clip == None else (clip if pileup[p] > clip else (1.0/clip if pileup[p] < 1.0/clip else pileup[p]))))
     fout.close()
   else:
-    print("Unknown output file extension '%s'" % outfile[-4:])
+    print "Unknown output file extension '%s'" % outfile[-4:]
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description = "Compute read pileup, perhaps weighted")

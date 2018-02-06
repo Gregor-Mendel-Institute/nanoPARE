@@ -24,13 +24,13 @@ def readWig(wig_file):
           masks[chrom] = numpy.array(mask, dtype='b') # boolean?
           mask = []
         chrom = params["chrom"]
-        print(chrom)
+        print chrom
         '''
         if chrom == "chr10":
           break
         '''
       elif start + count != int(params["start"]):
-        print("GAP!")
+        print "GAP!"
       start = int(params["start"])
       count = 0
     else:
@@ -42,9 +42,9 @@ def readWig(wig_file):
   fin.close()
 
   # fill out the empty chroms for testing...
-  for c in range(len(CHROMS)):
-    if CHROMS[c] not in masks:
-      print(("missing", CHROMS[c]))
+  for c in xrange(len(CHROMS)):
+    if not masks.has_key(CHROMS[c]):
+      print "missing", CHROMS[c]
       masks[c] = numpy.zeros(0, dtype='b')
     else:
       masks[c] = masks[CHROMS[c]]
@@ -54,7 +54,7 @@ def readWig(wig_file):
 
 def getRandom(chrom, first, last, cnt, mask=None):
   if mask is not None and numpy.sum(mask[chrom][first:last]) > 0:
-    nums = numpy.random.choice([i for i in range(first, last) if mask[chrom][i] == 1], cnt, replace=True)
+    nums = numpy.random.choice([i for i in xrange(first, last) if mask[chrom][i] == 1], cnt, replace=True)
   else:
     # for reads very near the end, this range can be 0, skip it
     if last <= first:
@@ -71,7 +71,7 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, exp=1, limit=None
   CHROMS = [c.split()[0] for c in open(chrom_file).read().strip().split('\n')]
 
   if mask is not None:
-    print("Reading alignability mask...")
+    print "Reading alignability mask..."
     mask = readWig(mask)
 
   baseline_kmer_counts = {}
@@ -80,22 +80,22 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, exp=1, limit=None
   leading = 1
   density_count = 1
 
-  print("Reading FASTA seqs...")
+  print "Reading FASTA seqs..."
   fa = pysam.Fastafile(fasta_file)
   refs = [fa.fetch(c).upper() for c in CHROMS]
   ref_lens = [len(r) for r in refs]
 
-  print("Reading BAM...")
+  print "Reading BAM..."
   bam = numpy.load(bam_npy_file)
   tot_reads = len(bam)
-  print(("%i reads" % tot_reads))
+  print "%i reads" % tot_reads
   num_reads = 0
   b = 0
   while b < tot_reads:
     read = bam[b]
 
     if b % 10**6 == 0:
-      print(("%i (%.2f%%)" % (b, float(b)/tot_reads*100)))
+      print "%i (%.2f%%)" % (b, float(b)/tot_reads*100)
 
     while leading < tot_reads and (bam[leading][0] < read[0] or (bam[leading][0] == read[0] and bam[leading][1] <= read[1] + SAMPLE_MARGIN)):
       if bam[leading][1] != bam[leading-1][1]: # count only 1 read at each unique position
@@ -109,7 +109,7 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, exp=1, limit=None
     #print "read %i (%s), leading %i (%s)" % (b, str(read), leading, str(bam[leading]))
 
     if density_count < 0:
-      print((density_count, "too low"))
+      print density_count, "too low"
 
     first = max(0, read[1] - SAMPLE_MARGIN) # inclusive
     last = min(ref_lens[read[0]] - k, read[1] + SAMPLE_MARGIN + 1 - k) # exclusive
@@ -130,8 +130,8 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, exp=1, limit=None
     b = leading + 1
 
   fout = open(output_file, 'w')
-  kmers = list(baseline_kmer_counts.keys())
-  total_kmers = sum(v for k,v in list(baseline_kmer_counts.items()))
+  kmers = baseline_kmer_counts.keys()
+  total_kmers = sum(v for k,v in baseline_kmer_counts.iteritems())
   fout.write(','.join(kmers) + "\n")
   fout.write(','.join(['%.4f' % (float(baseline_kmer_counts[k])/total_kmers) for k in kmers]))
   fout.close()

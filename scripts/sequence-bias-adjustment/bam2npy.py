@@ -13,8 +13,8 @@ def bam_count(bam, ref):
 
 bam = pysam.AlignmentFile(sys.argv[1], 'rb')
 refs = [c.split()[0] for c in open(sys.argv[2]).read().strip().split('\n')]
-print("Looking for", refs)
-print("in", bam.references)
+print "Looking for", refs
+print "in", bam.references
 CHROMS = [c for c in refs if c in bam.references]
 
 tagged = None
@@ -23,8 +23,8 @@ for r in bam.fetch(CHROMS[0]):
   break
 
 numreads = [bam_count(bam, chr) for chr in CHROMS]
-for i in range(len(CHROMS)):
-  print("%s: %i reads" % (CHROMS[i], numreads[i]))
+for i in xrange(len(CHROMS)):
+  print "%s: %i reads" % (CHROMS[i], numreads[i])
 numreads = sum(numreads)
 
 if tagged:
@@ -48,10 +48,10 @@ for chr in CHROMS:
     else:
       ary[i] = (chr_id, read.pos, read.is_reverse)
     i += 1
-  print("%s: %i reads written to numpy file" % (chr, i-last))
+  print "%s: %i reads written to numpy file" % (chr, i-last)
   last = i
 
 assert i == numreads, "Number of written reads doesn't match expected"
 
-print("%i reads marked as unmapped, but given valid reference_id and position - we did NOT use them." % flagged_unmapped)
+print "%i reads marked as unmapped, but given valid reference_id and position - we did NOT use them." % flagged_unmapped
 numpy.save(sys.argv[3], ary)

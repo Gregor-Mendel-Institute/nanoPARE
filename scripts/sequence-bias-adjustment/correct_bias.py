@@ -30,17 +30,17 @@ def read_baseline(f):
   data = [line.strip().split(',') for line in open(f, 'r').read().strip().split('\n')]
   baseline = {}
   k = len(data[0][0])
-  for i in range(len(data[0])):
+  for i in xrange(len(data[0])):
     baseline[data[0][i]] = float(data[1][i])
   return baseline
 
 def read_bias(f):
   data = [line.strip().split(',') for line in open(f, 'r').read().strip().split('\n')]
   k = len(data[0][1])
-  bias = [{} for i in range(len(data)-1)]
+  bias = [{} for i in xrange(len(data)-1)]
   header = data[0][1:]
-  for i in range(1, len(data)):
-    for h in range(len(header)):
+  for i in xrange(1, len(data)):
+    for h in xrange(len(header)):
       bias[i-1][header[h]] = float(data[i][h+1])
   return bias
 
@@ -56,56 +56,56 @@ def make_kmers(k):
 
 def compute_groups(baseline, bias, k, cov_matrix_file):
   tiles = []
-  print("Finding biased tiles.")
+  print "Finding biased tiles."
 
   def allele_variance(bias):
-    k = len(list(bias.keys())[0])
+    k = len(bias.keys()[0])
     alleles = {'A':[0]*k, 'C':[0]*k, 'G':[0]*k, 'T':[0]*k}
-    for i in range(k):
-      for kmer,v in bias.items():
+    for i in xrange(k):
+      for kmer,v in bias.iteritems():
         alleles[kmer[i]][i] += v
-    return sum([numpy.std(v) for v in list(alleles.values())]) / len(list(alleles.keys()))
+    return sum([numpy.std(v) for v in alleles.values()]) / len(alleles.keys())
 
   def kmer_variance(bias):
-    return numpy.std(list(bias.values()))
+    return numpy.std(bias.values())
 
   baseline_variance = allele_variance(bias[0])
-  print("Threshold (std of allele frequencies):", (baseline_variance * BIAS_THRESHOLD))
-  for i in range(0, len(bias) - k + 1):
+  print "Threshold (std of allele frequencies):", (baseline_variance * BIAS_THRESHOLD)
+  for i in xrange(0, len(bias) - k + 1):
     var = allele_variance(bias[i])
-    print(("Tile %i allele freq std:" % i), var)
+    print ("Tile %i allele freq std:" % i), var
     if var > baseline_variance * BIAS_THRESHOLD and (len(tiles) == 0 or i >= tiles[-1] + k):
       tiles.append(i)
 
   # compute covariance between tiles
   tile_covariance_matrix = numpy.load(cov_matrix_file)
   tile_same_matrix = [[0 for t in tiles] for u in tiles]
-  for i in range(len(tiles)):
+  for i in xrange(len(tiles)):
     t0 = tiles[i]
-    for j in range(i+1, len(tiles)):
+    for j in xrange(i+1, len(tiles)):
       t1 = tiles[j]
-      print(("tiles %i and %i:" % (t0, t1)), tile_covariance_matrix[t0][t1], "same if >", TILE_COVARIANCE_THRESHOLD)
+      print ("tiles %i and %i:" % (t0, t1)), tile_covariance_matrix[t0][t1], "same if >", TILE_COVARIANCE_THRESHOLD
       if tile_covariance_matrix[t0][t1] > TILE_COVARIANCE_THRESHOLD:
         tile_same_matrix[i][j] = True
         tile_same_matrix[j][i] = True
 
-  print("Tile similarity matrix:")
+  print "Tile similarity matrix:"
   for row in tile_same_matrix:
-    print(row)
+    print row
   groups = []
   while len(tiles) > 0:
     my_group = [0]
-    for i in range(1, len(tile_same_matrix[0])):
+    for i in xrange(1, len(tile_same_matrix[0])):
       if tile_same_matrix[0][i]:
         my_group.append(i)
     groups.append([tiles.pop(t) for t in my_group[::-1]])
     # remove in reverse order
     for i in my_group[::-1]:
       tile_same_matrix.pop(i)
-      for j in range(len(tile_same_matrix)):
+      for j in xrange(len(tile_same_matrix)):
         tile_same_matrix[j].pop(i)
 
-  print("Correction groups:", groups)
+  print "Correction groups:", groups
   return groups
 
 def get_weight(chr, pos, strand, k, length, ref, groups, bias, baseline):
@@ -119,7 +119,7 @@ def get_weight(chr, pos, strand, k, length, ref, groups, bias, baseline):
   composition = {'A':0, 'C':0, 'G':0, 'T':0}
   bad = False
   for a in seq:
-    if a not in composition:
+    if not composition.has_key(a):
       bad = True
       break
     composition[a] += 1
@@ -144,21 +144,21 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
   baseline = read_baseline(baseline_file)
   bias = read_bias(bias_file)
   # autodetect k
-  k = len(list(baseline.keys())[0])
-  print("k: %i" % k)
+  k = len(baseline.keys()[0])
+  print "k: %i" % k
 
   if bam_npy_file[-4:] != ".npy":
-    print("Input not bam.npy formatted")
+    print "Input not bam.npy formatted"
     return
 
   read_weights = []
 
   eval_length = MARGIN * 2 + 1
 
-  print("Reading FASTA seqs...")
+  print "Reading FASTA seqs..."
   ref = read_fasta(fasta_file, k)
 
-  print("Reading BAM...")
+  print "Reading BAM..."
   bam = numpy.load(bam_npy_file)
 
   groups = compute_groups(baseline, bias, k, cov_matrix_file) # tile k-mers over regions where bias deviates significantly from baseline
@@ -196,7 +196,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
     num_reads += 1
     if num_reads % 10**6 == 0:
       t = time.time()
-      print("%i reads done (%.2f%%) [%.2f reads/sec]" % (num_reads, float(num_reads)/bam.size*100, float(10**6)/(t-t0)))
+      print "%i reads done (%.2f%%) [%.2f reads/sec]" % (num_reads, float(num_reads)/bam.size*100, float(10**6)/(t-t0))
       t0 = t
 
     # keep track of how many reads are at each pos
@@ -214,7 +214,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
       ns += 1
       continue
     if weight == -2:
-      print("Incomplete (truncated) sequence at read %i" % num_reads)
+      print "Incomplete (truncated) sequence at read %i" % num_reads
       continue
 
     # neighborhood comparison
@@ -223,7 +223,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
     # remove past neighbors from cache
     while len(neighbor_cache) > 0 and (neighbor_cache[0][0] != read[0] or neighbor_cache[0][1] < read[1] - NEIGHBOR_MARGIN):
       neighbor_cache.pop(0)
-    for pos in range(read[1] - NEIGHBOR_MARGIN, read[1] + NEIGHBOR_MARGIN + 1):
+    for pos in xrange(read[1] - NEIGHBOR_MARGIN, read[1] + NEIGHBOR_MARGIN + 1):
       if pos == read[1]:
         continue
       for n in neighbor_cache:
@@ -263,12 +263,12 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
         frequencies[i][key] /= tot
     '''
 
-  print("%i reads with Ns" % ns)
+  print "%i reads with Ns" % ns
 
-  print("Average read weight: %.4f (weight has since been renormalized)" % (total_read_weight / r))
-  print("A value which deviates significantly from 1.0 indicates multiple non-independent adjustments and is probably a cause for concern")
+  print "Average read weight: %.4f (weight has since been renormalized)" % (total_read_weight / r)
+  print "A value which deviates significantly from 1.0 indicates multiple non-independent adjustments and is probably a cause for concern"
 
-  print("%i reads done, of %i (the remaineder filtered)." % (r, num_reads))
+  print "%i reads done, of %i (the remaineder filtered)." % (r, num_reads)
 
   '''
   print "Writing allele frequencies..."
@@ -286,7 +286,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
   fout.close()
   '''
 
-  print("Writing read weights...")
+  print "Writing read weights..."
   numpy.save(adjusted_file, read_weights)
 
 if __name__ == "__main__":

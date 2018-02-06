@@ -18,10 +18,10 @@ COMPL = maketrans("ACGTacgt", "TGCATGCA")
 
 def read_bias(f):
   data = [line.strip().split(',') for line in open(f).read().strip().split('\n')]
-  bias = [{} for i in range(MARGIN*2+1)]
+  bias = [{} for i in xrange(MARGIN*2+1)]
   header = data[0]
-  for i in range(1, len(data)):
-    for j in range(1, len(data[i])):
+  for i in xrange(1, len(data)):
+    for j in xrange(1, len(data[i])):
       bias[i-1][header[j]] = float(data[i][j])
   return len(header[1]), bias
 
@@ -31,7 +31,7 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
   k, bias = read_bias(bias_file)
   bam = numpy.load(bam_npy_file)
   fa = pysam.Fastafile(ref_file)
-  print("Reading FASTA file...")
+  print "Reading FASTA file..."
   refs = [fa.fetch(ch) for ch in CHROMS]
   tile_size = (k if tile else 1)
 
@@ -44,7 +44,7 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
   data = []
   i = 0
   s = 0
-  print("Processing reads...")
+  print "Processing reads..."
   for read in bam:
     if read[1] < MARGIN or read[1] >= len(refs[read[0]]) - MARGIN:
       continue
@@ -57,7 +57,7 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
     bad = False
     for a in seq:
       # These can be Ns or weird sequence like Kirk's (with Rs and Ms)
-      if a not in composition:
+      if not composition.has_key(a):
         bad = True
         break
       composition[a] += 1
@@ -66,29 +66,29 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
 
     i += 1
     if i % 1000000 == 0:
-      print(i)
+      print i
     if read_limit != None and i >= read_limit:
       break
 
     weight = ((clip if read[3] > clip else (1.0/clip if read[3] < 1.0/clip else read[3])) if clip is not None else read[3]) if len(read) > 3 else 1
 
     if s < read_count and (bam_reads == read_count or random.random() < read_prob):
-      for j in range(num_samples):
+      for j in xrange(num_samples):
         kmer = seq[j*tile_size:j*tile_size+k]
         a = bias[j*tile_size][kmer]
         stacks[j, s] = a * weight
       s += 1
 
-  correlation_matrix = [[0 for j in range(num_samples)] for l in range(num_samples)]
-  for j in range(num_samples):
+  correlation_matrix = [[0 for j in xrange(num_samples)] for l in xrange(num_samples)]
+  for j in xrange(num_samples):
     correlation_matrix[j][j] = 0
 
-  print("Computing covariance matrices...")
-  print("Taking a maximum of %i samples, to save memory" % num_samples)
-  print("stacks:", stacks.shape)
-  for j in range(num_samples):
-    print(j)
-    for l in range(j+1, num_samples):
+  print "Computing covariance matrices..."
+  print "Taking a maximum of %i samples, to save memory" % num_samples
+  print "stacks:", stacks.shape
+  for j in xrange(num_samples):
+    print j
+    for l in xrange(j+1, num_samples):
       matrix = numpy.vstack((stacks[j, :s],stacks[l, :s]))
       cov_matrix = numpy.corrcoef(matrix) # gets a normalized covariance matrix
       cov = cov_matrix[0][1]
@@ -101,11 +101,11 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
   cov_matrix = numpy.array(correlation_matrix)
   numpy.save(out_file, cov_matrix)
 
-  print(cov_matrix.shape)
-  print(list(range(0, cov_matrix.shape[0], 5)))
-  print(list(range(0, cov_matrix.shape[1], 5)))
-  cov_matrix = cov_matrix[list(range(0,cov_matrix.shape[0],5))][:,list(range(0,cov_matrix.shape[1],5))] # fancy indexing to get nonoverlapping tiles
-  print(cov_matrix.shape)
+  print cov_matrix.shape
+  print range(0, cov_matrix.shape[0], 5)
+  print range(0, cov_matrix.shape[1], 5)
+  cov_matrix = cov_matrix[range(0,cov_matrix.shape[0],5)][:,range(0,cov_matrix.shape[1],5)] # fancy indexing to get nonoverlapping tiles
+  print cov_matrix.shape
 
   # if plot:
     # plt.imshow(cov_matrix, interpolation="none")
