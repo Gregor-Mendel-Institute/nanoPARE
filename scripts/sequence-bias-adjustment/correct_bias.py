@@ -19,7 +19,7 @@ import time
 
 BASELINE_MARGIN = 50
 MARGIN = 40
-MAX_AT_POS = 5
+MAX_AT_POS = None
 CHROMS = None
 BIAS_THRESHOLD = 5 # fold change allowed in std of allele frequencies, relative to bias at -40
 TILE_COVARIANCE_THRESHOLD = 0.15 # tiles with kmers more correlated than this will be averaged, lower will be compounded
@@ -202,8 +202,9 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
     # keep track of how many reads are at each pos
     if read[1] == last_pos:
       num_at_pos += 1
-      if num_at_pos > MAX_AT_POS:
-        continue
+      if MAX_AT_POS:
+          if num_at_pos > MAX_AT_POS:
+            continue
     else:
       num_at_pos = 1
       last_pos = read[1]
