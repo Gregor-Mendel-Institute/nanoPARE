@@ -19,7 +19,7 @@ import time
 
 BASELINE_MARGIN = 50
 MARGIN = 40
-MAX_AT_POS = None
+# MAX_AT_POS = None
 CHROMS = None
 BIAS_THRESHOLD = 5 # fold change allowed in std of allele frequencies, relative to bias at -40
 TILE_COVARIANCE_THRESHOLD = 0.15 # tiles with kmers more correlated than this will be averaged, lower will be compounded
@@ -202,8 +202,8 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
     # keep track of how many reads are at each pos
     if read[1] == last_pos:
       num_at_pos += 1
-      if MAX_AT_POS:
-          if num_at_pos > MAX_AT_POS:
+      if args.max_at_pos:
+          if num_at_pos > args.max_at_pos:
             continue
     else:
       num_at_pos = 1
@@ -301,6 +301,7 @@ if __name__ == "__main__":
   parser.add_argument("adjusted", help="Output read weights (per-read adjustment, binary)")
   parser.add_argument("covmatrix", help="Tile covariance matrix (NPY)")
   parser.add_argument("--max", help="Maximum reads to process", type=int)
+  parser.add_argument("--max_at_pos", help="Maximum reads at a given position", type=int, default=None)
   parser.add_argument("--read_len", help="Read length, default is 20bp", type=int)
   args = parser.parse_args()
 

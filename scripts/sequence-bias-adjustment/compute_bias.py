@@ -3,7 +3,7 @@ import pysam
 import numpy
 from string import maketrans
 
-MAX_AT_POS = None #5
+# MAX_AT_POS = None
 #MAX_AT_POS = 160
 #print "------------- MAX_AT_POS: 160 (usually 5..) ---------------"
 CHROMS = None
@@ -47,7 +47,7 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, read_limit, clip,
     # keep track of how many reads are at each pos
     if read[1] == last_pos:
       num_at_pos += 1
-      if MAX_AT_POS is not None and num_at_pos > MAX_AT_POS:
+      if args.max_at_pos is not None and num_at_pos > args.max_at_pos:
         over_limit += 1
         continue
     else:
@@ -88,8 +88,8 @@ def main(bam_npy_file, fasta_file, chrom_file, k, output_file, read_limit, clip,
         kmer_counts[i][seq[i]] += weight
 
   print "%i reads done." % num_reads
-  if MAX_AT_POS is not None:
-    print "%i positions with >%i reads" % (over_limit, MAX_AT_POS)
+  if args.max_at_pos is not None:
+    print "%i positions with >%i reads" % (over_limit, args.max_at_pos)
 
   kmers = list(set([key for kmers in kmer_counts for key in kmers.keys() if 'N' not in key and len(key) == k]))
   if len(kmers[0]) == 1:
@@ -108,6 +108,7 @@ if __name__ == "__main__":
   parser.add_argument("k", help="k-mer size", type=int)
   parser.add_argument("out", help="Output (csv) file")
   parser.add_argument("--max", help="Maximum reads to process", type=int)
+  parser.add_argument("--max_at_pos", help="Maximum reads at a given position", type=int, default=None)
   parser.add_argument("--clip", help="Clip read weights to 1/N-N", type=float)
   parser.add_argument("--read_len", help="Read length", type=int, default=20)
   parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
