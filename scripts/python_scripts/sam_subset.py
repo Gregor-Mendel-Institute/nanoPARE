@@ -524,6 +524,11 @@ for chrom in overlap_groups.keys():
                 if strand == '-':
                     aa,ss,f = fu.longest_orf(fu.rc(sequence))
                     ORFstart,ORFstop = ss
+                    if ORFstart == 0:
+                        ORFstart = 1
+                    if ORFstop == len(positions):
+                        ORFstop = len(positions) - 1
+                    
                     if args.FEATURE == '5UTR':
                         positions = positions[-ORFstart:]
                     elif args.FEATURE == 'CDS':
@@ -540,7 +545,7 @@ for chrom in overlap_groups.keys():
                     elif args.FEATURE == '3UTR':
                         positions = positions[ORFstop:]
             
-            ANNO[s][transcripts[t].chrom].update(positions)
+            ANNO[s][chrom].update(positions)
 
 nucleotide_frequencies = {}
 if args.NUCFREQS:
