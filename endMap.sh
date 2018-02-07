@@ -335,6 +335,8 @@ samtools view -H star/Aligned.out.bam | grep '@SQ' | sed 's/^@SQ\tSN://' | sed '
 if [[ $BIAS == "true" ]]
 then
     samtools view -h star/Aligned.out.bam > full.unsorted.sam
+    #TODO: Fix module control, update so all scripts are Python3+ compatible
+    ml Python/3.5.2-foss-2016b    
     python $python_dir/sam_subset.py \
         -F $genome_fasta \
         -A $annotation_gff \
@@ -350,6 +352,7 @@ then
     # https://github.com/txje/sequence-bias-adjustment
     
     # setup environment
+    ml pysam/0.9.1.4-foss-2016a-Python-2.7.11
     bias_pipe=$root_dir/scripts/sequence-bias-adjustment
     bias_outdir=$sample_dir/seqbias
     k=4
@@ -374,27 +377,27 @@ then
     python $bias_pipe/bam2npy.py $bam $chroms $bamnpy
     python $bias_pipe/bam2npy.py $fullbam $chroms $fullbamnpy
     # compute nucleotide bias
-    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms 1 $bias_outdir/$sample_name.allele_frequencies.csv --read_len $read_len
+    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms 1 $bias_outdir/$sample_name.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5
     # compute k-mer baseline
     python $bias_pipe/compute_baseline.py $bamnpy $genome_fasta $chroms $k $baseline
     # compute k-mer bias
-    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms $k $kmer_bias --read_len $read_len
+    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms $k $kmer_bias --read_len $read_len --max_at_pos 5
     # compute tile covariance matrix
     python $bias_pipe/correlate_bias.py $bamnpy $genome_fasta $chroms $kmer_bias $tile_cov
     # correct bias in subset
-    python $bias_pipe/correct_bias.py $bamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/$sample_name.${k}mer_adjusted.allele_frequencies.csv $corrected_weights $tile_cov --read_len $read_len
+    python $bias_pipe/correct_bias.py $bamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/unused_slot.csv $corrected_weights $tile_cov --read_len $read_len --max_at_pos 5
     # compute corrected nucleotide bias
-    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.allele_frequencies.csv --read_len $read_len
+    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5
     # comput corrected k-mer bias
-    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len
+    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len --max_at_pos 5
     # apply bias correction to full bam file
-    python $bias_pipe/correct_bias.py $fullbamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/$sample_name.full.${k}mer_adjusted.allele_frequencies.csv $corrected_full_weights $tile_cov --read_len $read_len
+    python $bias_pipe/correct_bias.py $fullbamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/unused_slot.full.csv $corrected_full_weights $tile_cov --read_len $read_len
     # output reweighted bam file (weights stored to XW tag)
     python $bias_pipe/npy2bam.py $chroms $corrected_full_weights $fullbam full.adjusted.bam --tag
     # resort adjusted bam file by read name
     samtools view -h -n full.adjusted.bam > $sample_name.sam
     # cleanup temp files
-    rm -f sub.sorted.bam sub.unsorted.sam full.unsorted.sam $bamnpy $fullbamnpy
+    rm -f sub.unsorted.sam full.unsorted.sam $bamnpy $fullbamnpy
 else
     samtools view -h star/Aligned.out.bam > $sample_name.sam
 fi
@@ -410,6 +413,18 @@ then
         --untemp_out A C G T \
         --secondary \
         --allow_naive
+    
+    python $python_dir/readmapIO.py \
+        -S "$sample_name".W \
+        -I "$sample_name".sam \
+        -R $library_type \
+        -F $genome_fasta \
+        --softclip_type 5p \
+        --untemp_out A C G T \
+        --secondary \
+        --allow_naive \
+        --weighted
+
 else
     python $python_dir/readmapIO.py \
         -S "$sample_name" \
@@ -419,9 +434,20 @@ else
         --secondary \
         --allow_nonstranded \
         --allow_naive
+        
+    python $python_dir/readmapIO.py \
+        -S "$sample_name".W \
+        -I "$sample_name".sam \
+        -R $library_type \
+        -F $genome_fasta \
+        --secondary \
+        --allow_nonstranded \
+        --allow_naive \
+        --weighted
+
 fi
 
-rm "$sample_name".sam 
+# rm "$sample_name".sam 
 
 bedtools sort -i "$sample_name"_"$library_type"_plus.bedgraph > "$sample_name"_plus.bedgraph
 bedtools sort -i "$sample_name"_"$library_type"_minus.bedgraph > "$sample_name"_minus.bedgraph
