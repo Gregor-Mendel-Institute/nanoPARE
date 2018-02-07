@@ -1,12 +1,6 @@
 import logging
 import re
-from collections import defaultdict
-import sys
-if sys.version_info[0] > 2:
-    from abc import ABC, abstractmethod
-else:
-    from abc import ABCMeta, abstractmethod
-
+from abc import ABC, abstractmethod
 # import pandas as pd
 
 
@@ -86,48 +80,6 @@ def check_file_type_args(file_type):
                          '\'gff3\'')
 
 
-def get_grouped_transcripts(paths, file_type):
-    """Function that processes and returns all transcripts contained in an
-    GFF3 or GTF file as a dictionary and groups them by an id key as returned
-    by 'transcript.get_bio_id()', which is a a summary of an identical intron
-    chain, strand and chromosome. Single exon transcripts will only be grouped
-    by strand and chromosome.
-
-    Args:
-        paths (iterable): An iterable containing file paths.
-        file_type (str): The type of annotation file ('gtf' or 'gff3').
-
-    Returns:
-        transcripts (defaultdict(list)): A dictionary mapping where transcripts
-            are grouped based on overlapping identiy.
-            E.g. key: transcript.get_bio_id(), value: transcript
-
-    """
-    # TODO implement auto file detection
-    # TODO implement pandas compability
-    # if mode not in {'dictionary', 'pandas'}:
-    #     raise ValueError('Invalid file mode selected! Select either'
-    #                      '\'dictionary\' or \'pandas\'')
-    #
-    # LOGGER.info('Parsing file: %s Return type: %s', path, mode)
-    # raise an error if someone tries to give undefined parameter values
-    check_file_type_args(file_type)
-    # get regex patterns for appropriate processing according to file type
-    patterns = get_regex_pattern(file_type)
-    # some containers to hold correct transcripts and orphaned subfeatures
-    # which can arise from an unsorted file
-    transcripts = defaultdict(list)
-    # get the file content
-    for path in paths:
-        with open(path) as fin:
-            # generator to skipp over not needed data and to make things neater
-            for transcript in process_lines(fin, patterns):
-                # add transcripts and exon features in propper hierarchy
-                transcripts[transcript.get_bio_id()].append(transcript)
-    return transcripts
-
-
-
 def get_file_content(path, file_type, mode='dictionary'):
     """Function that processes and returns all transcripts contained in an
     GFF3 or GTF file either as a dictionary or a pandas data frame.
@@ -167,9 +119,9 @@ def get_file_content(path, file_type, mode='dictionary'):
             transcripts[transcript.name] = transcript
     if mode == 'dictionary':
         return transcripts
-    if mode == 'pandas':
-        # temp_df = pd.DataFrame.from_dict(transcripts, orient='index')
-        return temp_df.rename(columns={0:'transcript'})
+    # if mode == 'pandas':
+    #     temp_df = pd.DataFrame.from_dict(transcripts, orient='index')
+    #     return temp_df.rename(columns={0:'transcript'})
 
 
 
@@ -439,121 +391,62 @@ def write_to_file(file_name, file_type, features):
 
 
 # TODO: Add docsting for the classes and methods
-if sys.version_info[0] > 2:
-    class Feature(ABC):
-        """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
-        Implements most of the attributes of a genomic feature that are different
-        for each type of feature. Class Transript and Exon inherit from it.
+class Feature(ABC):
+    """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
+    Implements most of the attributes of a genomic feature that are different
+    for each type of feature. Class Transript and Exon inherit from it.
+
+    Args:
+        data (list): Columns of gff3/gtf line
+        feature_id (str): A string holding a unique identifier.
+
+    """
+    def __init__(self, data, feature_id):
+        # initilize variables and fill with some data
+        self.name = feature_id
+        self.score = data[SCORE_IDX]
+        self.strand = data[STRAND_IDX]
+        self.phase = data[FRAME_IDX]
+        self.start = data[START_IDX]
+        self.stop = data[STOP_IDX]
+        self.attributes = data[ATTR_IDX]
+
+
+    def get_attributes(self, file_type):
+        """Method that generates a string from a key,value dictionary containing
+        the genomic feature attributes (Column 9) in either as gtf or gff3 format.
+        Can be used for converting between file formats and printing.
 
         Args:
-            data (list): Columns of gff3/gtf line
-            feature_id (str): A string holding a unique identifier.
+            file_type (str): String indicating format that should be returned.
+                Needs to be either 'gff3' or 'gtf'.
+
+        Returns:
+            attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
+                in gff3 or gtf format.
 
         """
-        def __init__(self, data, feature_id):
-            # initilize variables and fill with some data
-            self.name = feature_id
-            self.score = data[SCORE_IDX]
-            self.strand = data[STRAND_IDX]
-            self.phase = data[FRAME_IDX]
-            self.start = data[START_IDX]
-            self.stop = data[STOP_IDX]
-            self.attributes = data[ATTR_IDX]
-
-
-        def get_attributes(self, file_type):
-            """Method that generates a string from a key,value dictionary containing
-            the genomic feature attributes (Column 9) in either as gtf or gff3 format.
-            Can be used for converting between file formats and printing.
-
-            Args:
-                file_type (str): String indicating format that should be returned.
-                    Needs to be either 'gff3' or 'gtf'.
-
-            Returns:
-                attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
-                    in gff3 or gtf format.
-
-            """
-            # The attribute colum consists out of key value pairs sitting in
-            # dictionary. This loop glues them back together with the appropriate
-            # file delimiter
-            attribs = []
-            for key, value in self.attributes.items():
-                if file_type == 'gtf':
-                    attribs.append(' '.join((key, '"' + value + '"')))
-                if file_type == 'gff3':
-                    attribs.append('='.join((key, value)))
+        # The attribute colum consists out of key value pairs sitting in
+        # dictionary. This loop glues them back together with the appropriate
+        # file delimiter
+        attribs = []
+        for key, value in self.attributes.items():
             if file_type == 'gtf':
-                return '; '.join(attribs) + ';'
+                attribs.append(' '.join((key, '"' + value + '"')))
             if file_type == 'gff3':
-                return ';'.join(attribs)
+                attribs.append('='.join((key, value)))
+        if file_type == 'gtf':
+            return '; '.join(attribs) + ';'
+        if file_type == 'gff3':
+            return ';'.join(attribs)
 
 
-        @abstractmethod
-        def get_feature_id(self, attributes):
-            """Getter method to return the unique feature id. Needs to be
-            implemented by classes inherting from Feature.
-            """
-            pass
-else:
-    class Feature:
-        """A class abstraction of a gff3/gtf genomic feature. Inherits from ABC.
-        Implements most of the attributes of a genomic feature that are different
-        for each type of feature. Class Transript and Exon inherit from it.
-
-        Args:
-            data (list): Columns of gff3/gtf line
-            feature_id (str): A string holding a unique identifier.
-
+    @abstractmethod
+    def get_feature_id(self, attributes):
+        """Getter method to return the unique feature id. Needs to be
+        implemented by classes inherting from Feature.
         """
-        __metaclass__ = ABCMeta
-        def __init__(self, data, feature_id):
-            # initilize variables and fill with some data
-            self.name = feature_id
-            self.score = data[SCORE_IDX]
-            self.strand = data[STRAND_IDX]
-            self.phase = data[FRAME_IDX]
-            self.start = data[START_IDX]
-            self.stop = data[STOP_IDX]
-            self.attributes = data[ATTR_IDX]
-
-
-        def get_attributes(self, file_type):
-            """Method that generates a string from a key,value dictionary containing
-            the genomic feature attributes (Column 9) in either as gtf or gff3 format.
-            Can be used for converting between file formats and printing.
-
-            Args:
-                file_type (str): String indicating format that should be returned.
-                    Needs to be either 'gff3' or 'gtf'.
-
-            Returns:
-                attributes (str): Feature attributes (Column 9 in gff3/gtf) as a string
-                    in gff3 or gtf format.
-
-            """
-            # The attribute colum consists out of key value pairs sitting in
-            # dictionary. This loop glues them back together with the appropriate
-            # file delimiter
-            attribs = []
-            for key, value in self.attributes.items():
-                if file_type == 'gtf':
-                    attribs.append(' '.join((key, '"' + value + '"')))
-                if file_type == 'gff3':
-                    attribs.append('='.join((key, value)))
-            if file_type == 'gtf':
-                return '; '.join(attribs) + ';'
-            if file_type == 'gff3':
-                return ';'.join(attribs)
-
-
-        @abstractmethod
-        def get_feature_id(self, attributes):
-            """Getter method to return the unique feature id. Needs to be
-            implemented by classes inherting from Feature.
-            """
-            pass
+        pass
 
 
 
@@ -568,11 +461,7 @@ class Transcript(Feature):
     """
     def __init__(self, data):
         # initilize the Feature super class and inherit from it.
-        if sys.version_info[0] > 2:
-            super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
-        else:
-            super(Feature, self).__init__(data, self.get_feature_id(data[ATTR_IDX]))
-        
+        super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
         # initilize variables and fill with some data
         self.chrom = data[CHROM_IDX]
         self.source = data[SOURCE_IDX]
@@ -597,41 +486,13 @@ class Transcript(Feature):
                 intron chains.
 
         """
-        # transcripts can only be equal when located on the same strand and
-        # chromosome and have an identical splice junctions/intron chain.
-        if self.strand != other.strand:
-            return False
+        # TODO rethink design and implementation
+        # transcripts can only be equal when the intron chain is identical
         if self.chrom != other.chrom:
             return False
-        if self.number_exons != other.number_exons:
+        if self.number_exons is not other.number_exons:
             return False
         return self.compare_intron_chain(other)
-
-
-    def get_bio_id(self):
-        """Method that returns an id that is a summary of the strand,
-        chromosome and inner splice junction positions. This id can be used to
-        group similar transcripts for biological meaningful comparisons (e.g.
-        transcripts that share the same strand, chromosome and splice
-        junctions). However comparing Transcript objects should be done
-        by the '=='/'!=' operators or the compare_intron_chain method as this
-        is slightly faster.
-
-        Returns:
-            id (str): An id string summarizing the transcript properties.
-                Consists out of strand + chromosome + exon_start_positions
-                + exon_stop_positions without the outer end positions (e.g.
-                +Ath_chr198457989089780598605).
-
-        """
-
-        if self.number_exons != 1:
-            id_str_1 = ''.join(map(str, self.get_exon_start()[1:]))
-            id_str_2 = ''.join(map(str, self.get_exon_end()[:-1]))
-            return self.strand + self.chrom + id_str_1 + id_str_2
-        # FIXME not an ideal solution. Need to come up with a way how to
-        # deal with single exon transcripts
-        return self.strand + self.chrom + '_1_exon'
 
 
     def compare_intron_chain(self, transcript, mode='full'):
@@ -790,10 +651,7 @@ class Exon(Feature):
     def __init__(self, data, exon_number):
         self.parent = self.get_parent(data[ATTR_IDX])
         self.exon_number = exon_number
-        if sys.version_info[0] > 2:
-            super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
-        else:
-            super(Feature, self).__init__(data, self.get_feature_id(data[ATTR_IDX]))
+        super().__init__(data, self.get_feature_id(data[ATTR_IDX]))
 
     def get_parent(self, attributes):
         """Getter method that returns a the parent id (transcript id) of an
@@ -834,4 +692,3 @@ class Exon(Feature):
         elif 'exon_id' in attributes:
             return attributes['exon_id']
         return 'exon:%s:%s' % (self.parent, self.exon_number)
-
