@@ -502,6 +502,7 @@ for chrom in start_end_index.keys():
             lpos = lnext
             next_loc += 1
 
+MIN_ORF = 100
 for chrom in overlap_groups.keys():
     for group in overlap_groups[chrom]:
         all_strands = set([transcripts[t].strand for t in group])
@@ -523,6 +524,8 @@ for chrom in overlap_groups.keys():
                 sequence = ''.join([genome[chrom][i] for i in positions])
                 if strand == '-':
                     aa,ss,f = fu.longest_orf(fu.rc(sequence))
+                    if len(aa) < MIN_ORF:
+                        continue
                     ORFstart,ORFstop = ss
                     if ORFstart == 0:
                         ORFstart = 1
@@ -537,6 +540,8 @@ for chrom in overlap_groups.keys():
                         positions = positions[:-ORFstop]
                 else:
                     aa,ss,f = fu.longest_orf(sequence)
+                    if len(aa) < MIN_ORF:
+                        continue
                     ORFstart,ORFstop = ss
                     if args.FEATURE == '5UTR':
                         positions = positions[:ORFstart]
