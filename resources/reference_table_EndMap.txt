@@ -103,9 +103,9 @@
 103 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples lt_7.1.fastq.gz,lt_7.2.fastq.gz lt_1_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 104 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples lt_8.1.fastq.gz,lt_8.2.fastq.gz lt_2_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 105 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples lt_9.1.fastq.gz,lt_9.2.fastq.gz lt_3_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
-106 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_1.1.fastq.gz,bc_1.2.fastq.gz bc_1_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
-107 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_2.1.fastq.gz,bc_2.2.fastq.gz bc_2_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
-108 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_3.1.fastq.gz,bc_3.2.fastq.gz bc_3_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
+106 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples col0_bc1.1.fastq.gz,col0_bc1.2.fastq.gz bc_1_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
+107 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples col0_bc2.1.fastq.gz,col0_bc2.2.fastq.gz bc_2_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
+108 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples col0_bc3.1.fastq.gz,col0_bc3.2.fastq.gz bc_3_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 109 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples mg_11.1.fastq.gz,mg_11.2.fastq.gz mg_1_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 110 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples mg_12.1.fastq.gz,mg_12.2.fastq.gz mg_2_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 111 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples mg_13.1.fastq.gz,mg_13.2.fastq.gz mg_3_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
