@@ -374,7 +374,6 @@ def check_if_unique(chrom,strand,endpos):
     is already represented in the COVERAGE dict.
     Returns boolean. """
     if endpos not in COVERAGE[strand][chrom]:
-        COVERAGE[strand][chrom].add(endpos)
         return True
     else:
         return False
@@ -388,6 +387,7 @@ def read_samfile(filename):
     for line in infile:
         if line[0]=='@':
             continue
+        
         l = line.rstrip().split('\t')
         ID = l[0]
         if ID == current_ID or current_ID is None:
@@ -401,18 +401,21 @@ def read_samfile(filename):
             else:
                 current_read = generate_read_from_sam(current_lines,keep_seq=True)
             
-            current_lines = [line]
-            current_ID = ID
             if current_read.primary:
                 mapping = list(current_read.primary.values())[0]
             elif args.SECONDARY and current_read.secondary:
                 mapping = list(current_read.secondary.values())[0]
             else:
+                current_lines = [line]
+                current_ID = ID
                 continue
+            
             chrom = mapping[0]
             strand = mapping[1]
             positions = get_mapping_positions(mapping[2][0][0],mapping[2][0][1])[0]
             if len(positions) < args.MINMATCH:
+                current_lines = [line]
+                current_ID = ID
                 continue
             
             if strand == '+':
@@ -424,13 +427,16 @@ def read_samfile(filename):
             if is_contained:
                 if args.UNIQUE:
                     is_unique = check_if_unique(chrom,strand,endpos)
+                    COVERAGE[strand][chrom].add(endpos)
                     if is_unique:
                         for samline in current_lines:
                             print(samline.rstrip())
                 else:
                     for samline in current_lines:
                         print(samline.rstrip())
-
+            
+            current_lines = [line]
+            current_ID = ID
 
 ############
 # EVALUATE # 
