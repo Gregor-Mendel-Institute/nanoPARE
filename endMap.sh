@@ -342,6 +342,7 @@ then
         -A $annotation_gff \
         -I full.unsorted.sam \
         --feature CDS \
+        --nucfreqs \
         --unique > sub.unsorted.sam
     samtools sort -O BAM -o sub.sorted.bam sub.unsorted.sam
     samtools index sub.sorted.bam
