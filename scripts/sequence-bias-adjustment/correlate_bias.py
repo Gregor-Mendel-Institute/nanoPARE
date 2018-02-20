@@ -10,13 +10,12 @@ import math
 import random
 from string import maketrans
 
-MARGIN = 40
 MEMORY_LIMIT = 32000000000 # 32 Gb (on bigmem, hopefully)
 
 CHROMS = None
 COMPL = maketrans("ACGTacgt", "TGCATGCA")
 
-def read_bias(f):
+def read_bias(f,MARGIN=args.margin):
   data = [line.strip().split(',') for line in open(f).read().strip().split('\n')]
   bias = [{} for i in xrange(MARGIN*2+1)]
   header = data[0]
@@ -25,10 +24,10 @@ def read_bias(f):
       bias[i-1][header[j]] = float(data[i][j])
   return len(header[1]), bias
 
-def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=None, tile=False, plot=False, clip=None):
+def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=None, tile=False, plot=False, clip=None, MARGIN=args.margin):
   global CHROMS
   CHROMS = [c.split()[0] for c in open(chrom_file).read().strip().split('\n')]
-  k, bias = read_bias(bias_file)
+  k, bias = read_bias(bias_file,args.margin)
   bam = numpy.load(bam_npy_file)
   fa = pysam.Fastafile(ref_file)
   print "Reading FASTA file..."
@@ -128,6 +127,7 @@ if __name__ == "__main__":
   parser.add_argument("--tile", help="Tile based on k-mer size?", action="store_true")
   parser.add_argument("--plot", help="Plot covariance matrix?", action="store_true")
   parser.add_argument("--clip", help="Clip weights", type=int)
+  parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
   args = parser.parse_args()
 
-  main(args.bam, args.ref, args.chroms, args.bias, args.out, args.limit, args.tile, args.plot, args.clip)
+  main(args.bam, args.ref, args.chroms, args.bias, args.out, args.limit, args.tile, args.plot, args.clip, args.margin)

@@ -18,7 +18,6 @@ import pysam
 import time
 
 BASELINE_MARGIN = 50
-MARGIN = 40
 # MAX_AT_POS = None
 CHROMS = None
 BIAS_THRESHOLD = 5 # fold change allowed in std of allele frequencies, relative to bias at -40
@@ -108,7 +107,7 @@ def compute_groups(baseline, bias, k, cov_matrix_file):
   print "Correction groups:", groups
   return groups
 
-def get_weight(chr, pos, strand, k, length, ref, groups, bias, baseline):
+def get_weight(chr, pos, strand, k, length, ref, groups, bias, baseline, MARGIN=args.margin):
   if strand:
     read_start = pos + length - 1
     seq = ref[chr][read_start - MARGIN:read_start + MARGIN + 1].translate(COMPL)[::-1]
@@ -138,7 +137,7 @@ def get_weight(chr, pos, strand, k, length, ref, groups, bias, baseline):
 
   return seq, weight
 
-def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_file, adjusted_file, cov_matrix_file, read_limit=None, read_len=20):
+def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_file, adjusted_file, cov_matrix_file, read_limit=None, read_len=20, MARGIN=args.margin):
   global CHROMS
   CHROMS = [c.split()[0] for c in open(chrom_file).read().strip().split('\n')]
   baseline = read_baseline(baseline_file)
@@ -209,7 +208,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
       num_at_pos = 1
       last_pos = read[1]
 
-    seq, weight = get_weight(read[0], read[1], read[2], k, read_len, ref, groups, bias, baseline)
+    seq, weight = get_weight(read[0], read[1], read[2], k, read_len, ref, groups, bias, baseline, MARGIN)
 
     if weight == -1:
       ns += 1
@@ -232,7 +231,7 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
           w = n[3]
           break
       else:
-        nearby_seq, w = get_weight(read[0], pos, read[2], k, read_len, ref, groups, bias, baseline)
+        nearby_seq, w = get_weight(read[0], pos, read[2], k, read_len, ref, groups, bias, baseline, MARGIN)
         if w >= 0:
           neighbor_cache.append((read[0], pos, read[2], w))
       if w < 0:
@@ -303,6 +302,7 @@ if __name__ == "__main__":
   parser.add_argument("--max", help="Maximum reads to process", type=int)
   parser.add_argument("--max_at_pos", help="Maximum reads at a given position", type=int, default=None)
   parser.add_argument("--read_len", help="Read length, default is 20bp", type=int)
+  parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
   args = parser.parse_args()
 
-  main(args.bam, args.ref, args.chroms, args.baseline, args.bias, args.out, args.adjusted, args.covmatrix, args.max, args.read_len)
+  main(args.bam, args.ref, args.chroms, args.baseline, args.bias, args.out, args.adjusted, args.covmatrix, args.max, args.read_len, args.margin)
