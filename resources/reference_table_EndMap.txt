@@ -138,3 +138,15 @@
 138 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_all_18.1.fastq.gz,bc_all_18.2.fastq.gz bc_all_1_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 139 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_all_19.1.fastq.gz,bc_all_19.2.fastq.gz bc_all_2_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
 140 /net/gmi.oeaw.ac.at/nodine/lab/members/Schon/lab_files/fastq_files/bookend_samples bc_all_20.1.fastq.gz,bc_all_20.2.fastq.gz bc_all_3_BODY BODY PE TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG
+141 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/Col-10ug_1 Col-10ug_1.fastq.gz Col-10ug_1 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+142 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/Col-10ug_2 Col-10ug_2.fastq.gz Col-10ug_2 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+143 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/Col-10ug_3 Col-10ug_3.fastq.gz Col-10ug_3 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+144 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/DCL1-1 DCL1-1.fastq.gz DCL1-1 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+145 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/DCL1-2 DCL1-2.fastq.gz DCL1-2 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+146 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/DCL1-3 DCL1-3.fastq.gz DCL1-3 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+147 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/dcl1-7-1 dcl1-7-1.fastq.gz dcl1-7-1 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+148 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/dcl1-7-2 dcl1-7-2.fastq.gz dcl1-7-2 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+149 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/dcl1-7-3 dcl1-7-3.fastq.gz dcl1-7-3 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+150 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/xrn4_M_1 xrn4_M_1.fastq.gz xrn4_M_1 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+151 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/xrn4_M_2 xrn4_M_2.fastq.gz xrn4_M_2 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC
+152 /lustre/scratch/users/michael.schon/nanoPARE/nanoPARE_seqfiles/xrn4_M_3 xrn4_M_3.fastq.gz xrn4_M_3 5P SE CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC

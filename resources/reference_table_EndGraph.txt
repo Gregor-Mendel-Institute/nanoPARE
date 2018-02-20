@@ -46,3 +46,6 @@
 46 xrn1_fb_1 fb_1_BODY 5P
 47 xrn1_fb_2 fb_2_BODY 5P
 48 xrn1_fb_3 fb_3_BODY 5P
+49 xrn4_M_1 xrn4_fb_1_BODY 5P
+50 xrn4_M_2 xrn4_fb_2_BODY 5P
+51 xrn4_M_3 xrn4_fb_3_BODY 5P
