@@ -100,6 +100,7 @@ adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from 
 RAM=30
 minimum_readlength=16
 minimum_pairlength=16
+sample_dir=$temp_dir/$sample_name
 
 echo "Parsed reference table:"
 echo "Line number: $line_number"
@@ -115,7 +116,6 @@ temp_dir_s=$temp_dir/star/$sample_name
 rm -rf $temp_dir_s
 OPTIONS_star_global=$(cat $resource_dir/OPTIONS_star_global)
 
-sample_dir=$temp_dir/$sample_name
 rm -rf $sample_dir
 mkdir -p $sample_dir
 
@@ -287,6 +287,7 @@ then
 
     echo "Filtering out low-complexity reads..."
     python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq 0.15
+#    cat "$sample_name"_cleaned.fastq > "$sample_name"_cleaned.1.fastq
     rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
@@ -334,6 +335,7 @@ samtools view -H star/Aligned.out.bam | grep '@SQ' | sed 's/^@SQ\tSN://' | sed '
 
 if [[ $BIAS == "true" ]]
 then
+    cd $sample_dir
     samtools view -h star/Aligned.out.bam > full.unsorted.sam
     #TODO: Fix module control, update so all scripts are Python3+ compatible
     ml Python/3.5.2-foss-2016b    
@@ -356,7 +358,7 @@ then
     ml pysam/0.9.1.4-foss-2016a-Python-2.7.11
     bias_pipe=$root_dir/scripts/sequence-bias-adjustment
     bias_outdir=$sample_dir/seqbias
-    k=4
+    k=3
     MARGIN=25
     mkdir -p $bias_outdir
     bam=sub.sorted.bam
