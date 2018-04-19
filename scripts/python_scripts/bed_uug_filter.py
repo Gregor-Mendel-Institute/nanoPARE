@@ -126,7 +126,7 @@ for line in feature_file:
     chrom = l[0]
     start_pos = int(l[1])
     end_pos = int(l[2])
-    peak_pos = int(l[6]) + start_pos
+    # peak_pos = int(l[6]) + start_pos
     secondary = l[-1]
     strand = l[5]
     readname = l[3]
@@ -134,7 +134,7 @@ for line in feature_file:
     if chrom not in features[strand]:
         features[strand][chrom] = {}
     
-    features[strand][chrom][peak_pos] = [
+    features[strand][chrom][start_pos] = [
         (start_pos,end_pos),
         score,
         readname,
