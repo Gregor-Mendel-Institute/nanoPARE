@@ -97,11 +97,11 @@ line_number=${input_array[0]}  # Line number of reference table (should match jo
 sample_name=${input_array[1]}  # name of sample type
 sample_list=$(echo ${input_array[2]} | tr ',' ' ')  # parse the comma-separated list of sample names
 WEIGHTED="true"
-if [ $WEIGHTED == "true" ]
+if [[ $WEIGHTED == "true" ]]
 then
-    ADJUSTMENT=( "R" )
-else
     ADJUSTMENT=( "R" "W" )
+else
+    ADJUSTMENT=( "R" )
 fi
 
 #####################
@@ -204,11 +204,7 @@ do
     
     bedtools sort -i $sample_name."$A".peaks.bed | awk '{printf $1"\t"$2"\t"$3"\t5P."NR"\t"$5"\t"$6"\t"$7"\n"}' > $sample_name."$A".rep_with_peaks.bed
     awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$7"\n" }' $sample_name."$A".rep_with_peaks.bed > $sample_name."$A".rep_only_peaks.bed
-    rm -f $sample_name."$A".peaks.bed \
-          $sample_name."$A".rep_with_peaks.bed \
-          $sample_name."$A".peaks.bed \
-          
-    
+    rm -f $sample_name."$A".peaks.bed
     
     # Heierarchically label each feature based on its relationship to reference:
     # PT (4 pts): peak position overlaps an annotated terminal exon
@@ -240,7 +236,7 @@ do
     grep -P '\t0$' $sample_name.PI.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t3\n" }' > $sample_name.PI.bed
     rm $sample_name.PI.tmp.bed
     
-    bedfile=$sample_name.rep_with_peaks.bed
+    bedfile=$sample_name."$A".rep_with_peaks.bed
     bedtools closest \
         -s -id \
         -D b \
@@ -317,7 +313,7 @@ do
         
         names+=( $s.plus $s.minus )
         capped_bedgraphs+=( $endgraph_dir/$s/5P."$A"_plus_mask.bedgraph $endgraph_dir/$s/5P."$A"_minus_mask.bedgraph )
-        noncapped_bedgraphs+=( $data_folder/$s.capmask.plus.bedgraph $data_folder/$s.capmask.minus.bedgraph )
+        noncapped_bedgraphs+=( $data_folder/$s."$A".capmask.plus.bedgraph $data_folder/$s."$A".capmask.minus.bedgraph )
     done
     
     echo "Cap masking merged bedgraph..."
@@ -346,6 +342,8 @@ do
     
     cat $sample_name."$A".overlapping.capped.bed exons.bed > "$sample_name"."$A"_gene_features.bed
     rm $sample_name."$A".overlapping.capped.bed
+    # Store a sample.A.feature_lengths.tsv file with all capped/noncapped features
+    touch $sample_name."$A"_feature_lengths.tsv
     
     echo "Calculating gene-level total and uncapped read coverage..."
     python $coverage \
@@ -354,6 +352,7 @@ do
         -N ${names[@]} \
         -O "$sample_name"."$A"_capped_coverage.tsv \
         -L $length_table 
+    cat feature_lengths.tsv >> $sample_name."$A"_feature_lengths.tsv
     
     python $coverage \
         -F $sample_name."$A".noncapped.bed \
@@ -361,6 +360,7 @@ do
         -N ${names[@]} \
         -O "$sample_name"."$A"_noncapped_coverage.tsv \
         -L $length_table
+    cat feature_lengths.tsv >> $sample_name."$A"_feature_lengths.tsv
     
     python $coverage \
         -F "$sample_name"."$A"_gene_features.bed \
