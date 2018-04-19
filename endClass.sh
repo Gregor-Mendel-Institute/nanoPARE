@@ -207,7 +207,7 @@ do
         -V pass
     
     # Classify features against the annotated list of genes
-    awk '{ printf $1"\t"$2+$5"\t"$2+$5+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
+    awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$7"\n" }'\
         $sample_name."$A".peaks.bed | bedtools sort > $sample_name.$A.only_peaks.bed
     bedfile=$sample_name.$A.only_peaks.bed
 
