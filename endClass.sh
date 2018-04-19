@@ -266,7 +266,7 @@ do
         $sample_name.intronic.bed \
         $sample_name.antisense.bed \
         $sample_name.anti_intronic.bed > $sample_name.gene.bed
-    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t.\t.\t0\n"}' consensus/fb.$A.consensus.sorted.bed >> $sample_name.gene.bed
+    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t.\t.\t0\n"}' $sample_name."$A".peaks.bed >> $sample_name.gene.bed
     # Add a +-1 buffer to each feature to ensure that untemplated upstream nucleotides are included in the range
     bedtools sort -i $sample_name.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $sample_name.gene.sorted.bed
     
