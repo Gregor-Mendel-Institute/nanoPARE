@@ -190,26 +190,31 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
     
     for i in bed_dict[chrom]:
         start,end,strand,name,score,other = i
-        vector = coverage[strand][chrom][start:end]
+        vector = [coverage[strand][chrom].get(n,0) for n in range(start,end)]
         if continuous:
             peaks = find_peaks(vector)
         else:
             peaks = sorted_positions(vector)
         
         if args.trim:
-            # set a cutoff of 95% of the total score
-            target = sum(vector)*args.trim
+            # set a cutoff of the proportion "trim" of the total score
+            target = sum(vector)*float(args.trim)
+            if target == 0:
+                print("# WARNING: zero reads in {}".format(name))
+                continue
             sv = sorted(vector,reverse=True)
             cumsum = [sum(sv[:(i+1)]) for i in range(len(sv))]
-            # Find the minimum number of positions to explain >=90% of vector
-            score = min(which([float(i) >= target for i in cumsum]))+1
+            # Find the minimum number of positions to explain "trim" of vector
+            passes_threshold = which([float(i) >= target for i in cumsum])
+            if passes_threshold:
+                score = min(passes_threshold)+1
+            else:
+                score = len(sv)
+            
             # Filter out all values less than the height threshold to 0
             filterval = sv[score-1]
             filtervector = [i if i >= filterval else 0 for i in vector]
             nonzeropos = which([i>0 for i in filtervector])
-            if not nonzeropos:
-                # print("# WARNING: zero reads in {}".format(name))
-                continue
             
             end = max(nonzeropos)+start+1
             start = min(nonzeropos)+start
@@ -298,8 +303,8 @@ coverage={}
 coverage['+'] = {}
 coverage['-'] = {}
 for chrom,chromlen in chromosomes.items():
-    coverage['+'][chrom] = [0]*chromlen
-    coverage['-'][chrom] = [0]*chromlen
+    coverage['+'][chrom] = {}
+    coverage['-'][chrom] = {}
 
 for file in args.bedgraph_plus:
     coverage_file = open(file)
@@ -307,7 +312,7 @@ for file in args.bedgraph_plus:
         chrom,start,end,count = line.rstrip().split()
         count = float(count)
         for i in range(int(start),int(end)):
-            coverage['+'][chrom][i] += count
+            coverage['+'][chrom][i] = coverage['+'][chrom].get(i,0) + count
     coverage_file.close()
 
 for file in args.bedgraph_minus:
@@ -316,12 +321,12 @@ for file in args.bedgraph_minus:
         chrom,start,end,count = line.rstrip().split()
         count = float(count)
         for i in range(int(start),int(end)):
-            coverage['-'][chrom][i] += count
+            coverage['-'][chrom][i] = coverage['-'][chrom].get(i,0) + count
     coverage_file.close()
 
 readnumber = int(
-    sum([sum(i) for i in coverage['+'].values()]) +
-    sum([sum(i) for i in coverage['+'].values()])
+    sum([sum(i.values()) for i in coverage['+'].values()]) +
+    sum([sum(i.values()) for i in coverage['+'].values()])
 )
 
 # Imports input bed file, organizing by chromosome
