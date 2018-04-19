@@ -37,11 +37,20 @@ parser.add_argument(
     type=str, help='lengths table', action='store',
     required=True
 )
-
+parser.add_argument(
+    '--trim', dest='trim', type=float,
+    help='if true, edges of output features are trimmed to regions with signal',
+    default=None
+)
 parser.add_argument(
     '-V', '--value', dest='value', type=str,
     help='type of score to output in bed file',
-    choices=['pass','sum','rpm','mean','max','winsor','period','byrank','allvalues'], default='pass'
+    choices=['pass','sum','rpm','mean','max','threshold','period','byrank','allvalues'], default='pass'
+)
+parser.add_argument(
+    '-T', '--threshold', dest='threshold', type=float,
+    help='minimum score to output a feature',
+    default=None
 )
 
 args = parser.parse_args()
@@ -103,9 +112,9 @@ def fold_vector_from_peak(vector):
     return folded_vector
 
     
-def find_max_period(vector, winsorize=False, quantize=False):
+def find_max_period(vector, thresholdize=False, quantize=False):
     """Determine which phase contains the highest mean read counts"""
-    if winsorize:
+    if thresholdize:
         # set a cutoff of 90% of the total score
         target = sum(vector)*.9
         sv = sorted(vector,reverse=True)
@@ -186,6 +195,25 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
             peaks = find_peaks(vector)
         else:
             peaks = sorted_positions(vector)
+        
+        if args.trim:
+            # set a cutoff of 95% of the total score
+            target = sum(vector)*args.trim
+            sv = sorted(vector,reverse=True)
+            cumsum = [sum(sv[:(i+1)]) for i in range(len(sv))]
+            # Find the minimum number of positions to explain >=90% of vector
+            score = min(which([float(i) >= target for i in cumsum]))+1
+            # Filter out all values less than the height threshold to 0
+            filterval = sv[score-1]
+            filtervector = [i if i >= filterval else 0 for i in vector]
+            nonzeropos = which([i>0 for i in filtervector])
+            if not nonzeropos:
+                # print("# WARNING: zero reads in {}".format(name))
+                continue
+            
+            end = max(nonzeropos)+start+1
+            start = min(nonzeropos)+start
+        
         if len(peaks) == 0:
             dompeak = '.'
             otherpeaks = '.'
@@ -197,33 +225,6 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                 otherpeaks = '.'
         if args.value == 'pass':
             score = score
-        elif args.value == 'winsor':
-            # set a cutoff of 90% of the total score
-            target = sum(vector)*.9
-            sv = sorted(vector,reverse=True)
-            cumsum = [sum(sv[:(i+1)]) for i in range(len(sv))]
-            # Find the minimum number of positions to explain >=90% of vector
-            score = min(which([float(i) >= target for i in cumsum]))+1
-            # Filter out all values less than the height threshold to 0
-            filterval = sv[score-1]
-            filtervector = [i if i >= filterval else 0 for i in vector]            
-            # Calculate the mean distance between positions with values
-            if score <= 1:
-                meansep = 0
-            else:
-                seps = 0
-                lastpos = None
-                positions = 0
-                for pos in range(len(filtervector)):
-                    if filtervector[pos]:
-                        if lastpos:
-                            seps += pos - lastpos
-                        lastpos = pos
-                        positions += 1
-                
-                meansep = round(float(seps) / (positions - 1), 3)
-            
-            score = "{},{}".format(score,meansep)
         elif args.value == 'period':
             score = find_max_period(vector)
         elif args.value == 'byrank':
@@ -258,13 +259,17 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
         else:
             score = sum(vector)
         
+        if args.threshold:
+            if score < args.threshold:
+                continue
+        
         queue.put(
             '\t'.join(
                 [
                     chrom,
                     str(start),
                     str(end),
-                    '.'.join([chrom,str(counter)]),
+                    name,
                     str(score),
                     strand,
                     str(dompeak),
@@ -323,6 +328,9 @@ readnumber = int(
 bed_dict = {}
 file = open(args.bed_in)
 for line in file:
+    if line[0]=='#':
+        continue
+    
     l = line.rstrip().split('\t')
     chrom = l[0]
     start = int(l[1])
@@ -330,7 +338,11 @@ for line in file:
     name = l[3]
     score = l[4]
     strand = l[5]
-    other = l[6]
+    if len(l) > 6:
+        other = l[6]
+    else:
+        other = '.'
+    
     if chrom not in bed_dict:
         bed_dict[chrom] = []
     bed_dict[chrom] += [(start,end,strand,name,score,other)]

@@ -139,7 +139,9 @@ do
     rm -f $sample_name."$A".all.bed
     touch $sample_name."$A".all.bed
     plus_list=()
+    plus_names=()
     minus_list=()
+    minus_names=()
     plus_list_uug=()
     minus_list_uug=()
     for s in ${samples[@]}
@@ -149,7 +151,9 @@ do
             >> $sample_name."$A".all.bed
         
         plus_list+=($endgraph_dir/$s/5P."$A"_plus_mask.bedgraph)
+        plus_names+=($s.plus)
         minus_list+=($endgraph_dir/$s/5P."$A"_minus_mask.bedgraph)
+        minus_names+=($s.minus)
         plus_list_uug+=($endgraph_dir/$s/uuG_plus_mask.bedgraph)
         minus_list_uug+=($endgraph_dir/$s/uuG_minus_mask.bedgraph)
     done
@@ -199,86 +203,91 @@ do
         -O $sample_name."$A".peaks.bed \
         -BP $sample_name."$A".plus.bedgraph \
         -BM $sample_name."$A".minus.bedgraph \
-        -L $length_table \
+        -L $length_table --trim 1 \
         -V pass
     
-    bedtools sort -i $sample_name."$A".peaks.bed | awk '{printf $1"\t"$2"\t"$3"\t5P."NR"\t"$5"\t"$6"\t"$7"\n"}' > $sample_name."$A".rep_with_peaks.bed
-    awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$7"\n" }' $sample_name."$A".rep_with_peaks.bed > $sample_name."$A".rep_only_peaks.bed
-    rm -f $sample_name."$A".peaks.bed
-    
-    # Heierarchically label each feature based on its relationship to reference:
-    # PT (4 pts): peak position overlaps an annotated terminal exon
-    # PI (3 pts): peak position overlaps an annotated internal exon
-    # FT (2 pts): >=1nt of the feature overlaps an annotated terminal exon
-    # FI (1 pt): >=1nt of the feature overlaps an annotated internal exon
-    # O (0 pts): other peak, no overlap to any annotated genes
-    
-    bedfile=$sample_name."$A".rep_only_peaks.bed
-    bedtools closest \
-        -s -id \
-        -D b \
-        -t first \
+    # Classify features against the annotated list of genes
+    awk '{ printf $1"\t"$2+$5"\t"$2+$5+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
+        $sample_name."$A".peaks.bed | bedtools sort > $sample_name.$A.only_peaks.bed
+    bedfile=$sample_name.$A.only_peaks.bed
+
+    bedtools closest -s -id -D b -t first \
         -a $bedfile \
-        -b terminal_exons_by_gene.gff \
-        > $sample_name.PT.tmp.bed
-    
-    grep -P '\t0$' $sample_name.PT.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t4\n" }' > $sample_name.PT.bed
-    rm $sample_name.PT.tmp.bed
-    
-    bedtools closest \
-        -s -id \
-        -D b \
-        -t first \
+        -b terminal_exons_by_gene.gff > $sample_name.terminal.tmp.bed
+    grep -P '\t0$' $sample_name.terminal.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t6\n" }' > $sample_name.terminal_exon_overlap.bed
+    grep -v -P '\t0$' $sample_name.terminal.tmp.bed | awk '{ if ( $19 >= -500 ) printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t4\n" }' > $sample_name.upstream.bed
+    rm $sample_name.terminal.tmp.bed
+
+    bedtools closest -s -id -D b -t first \
         -a $bedfile \
-        -b exons_by_gene.gff \
-        > $sample_name.PI.tmp.bed
-    
-    grep -P '\t0$' $sample_name.PI.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t3\n" }' > $sample_name.PI.bed
-    rm $sample_name.PI.tmp.bed
-    
-    bedfile=$sample_name."$A".rep_with_peaks.bed
-    bedtools closest \
-        -s -id \
-        -D b \
-        -t first \
+        -b exons_by_gene.gff > $sample_name.nearest_downstream.tmp.bed
+    grep -P '\t0$' $sample_name.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t5\n" }' > $sample_name.exon_overlap.bed
+    bedtools intersect -v -wa -a $sample_name.exon_overlap.bed -b $sample_name.terminal_exon_overlap.bed > $sample_name.internal_exon_overlap.bed
+    grep -v -P '\t0$' $sample_name.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t0\n" }' > $sample_name.is_upstream_of.bed
+    bedtools intersect -v -wa -a $sample_name.is_upstream_of.bed -b $sample_name.upstream.bed > $sample_name.nearest_downstream.bed
+    rm $sample_name.nearest_downstream.tmp.bed $sample_name.exon_overlap.bed
+
+    bedtools closest -s -iu -D b -t first \
         -a $bedfile \
-        -b terminal_exons_by_gene.gff \
-        > $sample_name.FT.tmp.bed
-    
-    grep -P '\t0$' $sample_name.FT.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t2\n"}' > $sample_name.FT.bed
-    rm $sample_name.FT.tmp.bed
-    
-    bedtools closest \
-        -s -id \
-        -D b \
-        -t first \
-        -a $bedfile \
-        -b exons_by_gene.gff \
-        > $sample_name.FI.tmp.bed
-    
-    grep -P '\t0$' $sample_name.FI.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t1\n"}' > $sample_name.FI.bed
-    grep -v -P '\t0$' $sample_name.FI.tmp.bed | awk '{printf $1"\t"$2"\t"$3"\t"$4"\t"$7"\t"$6"\t"$16"\t"$17"\t0\n"}' > $sample_name.O.bed
-    rm $sample_name.FI.tmp.bed
-    
+        -b exons_by_gene.gff > $sample_name.nearest_upstream.tmp.bed
+    grep -v -P '\t0$' $sample_name.nearest_upstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t0\n" }' > $sample_name.is_downstream_of.bed
+    bedtools intersect -v -wa -a $sample_name.is_downstream_of.bed -b $sample_name.upstream.bed > $sample_name.nearest_upstream.bed
+    rm $sample_name.nearest_upstream.tmp.bed $sample_name.is_downstream_of.bed
+
+    bedtools closest -a $sample_name.nearest_upstream.bed -b $sample_name.nearest_downstream.bed \
+        | awk '{ if ( $18 == 0 && $7 == $16 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$17"\t3\n" }' \
+        > $sample_name.intronic.bed
+
+    cat $sample_name.terminal_exon_overlap.bed $sample_name.upstream.bed $sample_name.internal_exon_overlap.bed $sample_name.intronic.bed \
+        | bedtools sort > $sample_name.all_sense.bed
+    bedtools intersect -v -s -wa -a $bedfile -b $sample_name.all_sense.bed > $sample_name.residuals.bed
+
+    bedtools closest -S -id -D b -t first \
+        -a $sample_name.residuals.bed \
+        -b exons_by_gene.gff > $sample_name.antisense_a.tmp.bed
+    grep -P '\t0$' $sample_name.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t2\n" }' > $sample_name.antisense.bed
+    grep -v -P '\t0$' $sample_name.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t0\n" }' > $sample_name.anti_upstream_of.bed
+
+    bedtools closest -S -iu -D b -t first \
+        -a $sample_name.residuals.bed \
+        -b exons_by_gene.gff > $sample_name.antisense_d.tmp.bed
+    grep -v -P '\t0$' $sample_name.antisense_d.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t0\n" }' > $sample_name.anti_downstream_of.bed
+    bedtools closest -a $sample_name.anti_upstream_of.bed -b $sample_name.anti_downstream_of.bed \
+        | awk '{ if ( $18 == 0 && $7 == $16 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$17"\t1\n" }' \
+        > $sample_name.anti_intronic.bed
+
+    rm $sample_name.antisense_a.tmp.bed $sample_name.antisense_d.tmp.bed
+
     # Collapse the decision tree into a single BED file, with each feature
     # represented by its highest-scoring match.
-    cat $sample_name.PT.bed $sample_name.PI.bed $sample_name.FT.bed $sample_name.FI.bed $sample_name.O.bed | bedtools sort > $sample_name.gene.bed
-    python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.bed \
-        | sed 's/\t0\t4$/\tPT/' \
-        | sed 's/\t0\t3$/\tPI/' \
-        | sed 's/\t0\t2$/\tFT/' \
-        | sed 's/\t0\t1$/\tFI/' \
-        | sed 's/\t0$//' \
-        | awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$8"\t"$6"\t"$5"\t"$7"\n" }' \
-        > $sample_name."$A".all_features.bed
+    cat $sample_name.terminal_exon_overlap.bed \
+        $sample_name.upstream.bed \
+        $sample_name.internal_exon_overlap.bed \
+        $sample_name.intronic.bed \
+        $sample_name.antisense.bed \
+        $sample_name.anti_intronic.bed > $sample_name.gene.bed
+    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t.\t.\t0\n"}' consensus/fb.$A.consensus.sorted.bed >> $sample_name.gene.bed
+    # Add a +-1 buffer to each feature to ensure that untemplated upstream nucleotides are included in the range
+    bedtools sort -i $sample_name.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $sample_name.gene.sorted.bed
     
-    rm -f $sample_name.PT.bed \
-          $sample_name.PI.bed \
-          $sample_name.FT.bed \
-          $sample_name.FI.bed \
-          $sample_name.O.bed \
-          $sample_name.gene.bed \
-          $sample_name."$A".rep_only_peaks.bed
+    python $pydir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.sorted.bed | bedtools sort > $sample_name.all.sorted.bed
+    python $pydir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.all.sorted.bed \
+        | sed 's/\t6$/\tP/' \
+        | sed 's/\t5$/\tD/' \
+        | sed 's/\t4$/\tU/' \
+        | sed 's/\t3$/\tI/' \
+        | sed 's/\t2$/\tA/' \
+        | sed 's/\t1$/\tIA/' \
+        | sed 's/\t0$/\tN/' \
+        > $sample_name."$A".all_features.bed
+
+    rm -f $sample_name.gene.bed $sample_name.gene.sorted.bed $sample_name.all.sorted.bed
+    rm -f $sample_name.upstream.bed $sample_name.terminal_exon_overlap.bed $sample_name.is_upstream_of.bed \
+        $sample_name.internal_exon_overlap.bed $sample_name.nearest_downstream.bed $sample_name.residuals.bed \
+        $sample_name.nearest_upstream.bed $sample_name.intronic.bed $sample_name.all_sense.bed $sample_name.antisense.bed \
+        $sample_name.anti_upstream_of.bed $sample_name.anti_intronic.bed $sample_name.anti_downstream_of.bed
+    ########################################################
+    
     
     echo "Splitting capped and noncapped features..."
     
@@ -334,46 +343,30 @@ do
     # (1) capped, and
     # (2) within 50nt of an existing gene annotation
     
-    awk -F'[\t]' \
-        'function abs(v) {return v < 0 ? -v : v};
-        {if (abs($5) <= 50){ print }}' \
-        $sample_name."$A".capped.bed \
-        > $sample_name."$A".overlapping.capped.bed
+    bedtools sort -i exons_by_gene.gff |\
+        awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
+        bedtools merge -s -nms |\
+        sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
+        bedtools sort > exons_by_gene.bed
     
-    cat $sample_name."$A".overlapping.capped.bed exons.bed > "$sample_name"."$A"_gene_features.bed
-    rm $sample_name."$A".overlapping.capped.bed
-    # Store a sample.A.feature_lengths.tsv file with all capped/noncapped features
-    touch $sample_name."$A"_feature_lengths.tsv
+    bedtools subtract -a exons_by_gene.bed -b $sample_name."$A".capped.bed -s > $sample_name."$A".exons_noncapped.bed
+    grep -P '\t[PIUD]_.*$' $sample_name."$A".capped.bed |\
+        awk '{ printf $1"\t"$2"\t"$3"\t"$7"\t"$5"\t"$6"\n" }' > $sample_name."$A".exons_capped.bed
     
-    echo "Calculating gene-level total and uncapped read coverage..."
-    python $coverage \
-        -F $sample_name."$A".capped.bed \
-        -I ${capped_bedgraphs[@]} \
-        -N ${names[@]} \
-        -O "$sample_name"."$A"_capped_coverage.tsv \
-        -L $length_table 
-    cat feature_lengths.tsv >> $sample_name."$A"_feature_lengths.tsv
     
-    python $coverage \
-        -F $sample_name."$A".noncapped.bed \
-        -I ${capped_bedgraphs[@]} \
-        -N ${names[@]} \
-        -O "$sample_name"."$A"_noncapped_coverage.tsv \
-        -L $length_table
-    cat feature_lengths.tsv >> $sample_name."$A"_feature_lengths.tsv
+    echo "Calculating gene-level capped and noncapped read coverage..."
+    python $python_dir/bed_feature_coverage.py \
+        -L length.table -F $sample_name."$A".exons_capped.bed \
+        -I ${plus_list[@]} ${minus_list[@]} \
+        -N ${plus_names[@]} ${minus_names[@]} \
+        -O $sample_name."$A".capped.counts.tsv
     
-    python $coverage \
-        -F "$sample_name"."$A"_gene_features.bed \
-        -I ${capped_bedgraphs[@]} \
-        -N ${names[@]} \
-        -O "$sample_name"."$A"_total_coverage.tsv \
-        -L $length_table
-    
-    python $coverage \
-        -F "$sample_name"."$A"_gene_features.bed \
-        -I ${noncapped_bedgraphs[@]} \
-        -N ${names[@]} \
-        -O "$sample_name"."$A"_capmasked_coverage.tsv \
-        -L $length_table
+    python $python_dir/bed_feature_coverage.py \
+        -L length.table -F $sample_name."$A".exons_noncapped.bed \
+        -I ${plus_list[@]} ${minus_list[@]} \
+        -N ${plus_names[@]} ${minus_names[@]} \
+        -O $sample_name."$A".noncapped.counts.tsv
+        
 done
 

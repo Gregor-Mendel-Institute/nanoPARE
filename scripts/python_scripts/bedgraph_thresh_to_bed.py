@@ -88,6 +88,9 @@ def find_peaks(vector):
         was_plateau = plateau
         was_inc     = inc
         prev        = curr
+    if not peaks:
+        if was_inc or was_plateau:
+            peaks += [i]
     return peaks
 
 def writer(merge_filename,shared_queue,stop_token):
@@ -114,7 +117,7 @@ def find_bed_features(chrom,chromlen,queue):
     featurecount = 0
     # Iterate through regions, writing a BED entry if large enough
     for chromStart,chromEnd in region_endpoints:
-        if chromEnd - chromStart >= args.minimum:
+        if chromEnd + 1 - chromStart >= args.minimum:
             featurecount += 1
             name = '.'.join(['thresh',chrom,str(featurecount)])
             coverage_subset = [coverage[chrom].get(i,0) for i in range(chromStart,chromEnd+1)]

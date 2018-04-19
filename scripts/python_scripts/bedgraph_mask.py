@@ -123,7 +123,7 @@ if args.BED_INSIDE:
         start_pos=int(l[1])
         end_pos=int(l[2])
         strand = l[5]
-        mask_positions[chrom][strand].update(set(range(start_pos,end_pos)))
+        mask_positions[chrom][strand].update(set(range(start_pos,end_pos+1)))
     mask_file.close()
 
 if args.PLUS_BG:
