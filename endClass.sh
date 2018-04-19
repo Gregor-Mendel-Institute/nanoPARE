@@ -270,8 +270,8 @@ do
     # Add a +-1 buffer to each feature to ensure that untemplated upstream nucleotides are included in the range
     bedtools sort -i $sample_name.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $sample_name.gene.sorted.bed
     
-    python $pydir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.sorted.bed | bedtools sort > $sample_name.all.sorted.bed
-    python $pydir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.all.sorted.bed \
+    python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.sorted.bed | bedtools sort > $sample_name.all.sorted.bed
+    python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.all.sorted.bed \
         | sed 's/\t6$/\tP/' \
         | sed 's/\t5$/\tD/' \
         | sed 's/\t4$/\tU/' \
@@ -357,13 +357,13 @@ do
     
     echo "Calculating gene-level capped and noncapped read coverage..."
     python $python_dir/bed_feature_coverage.py \
-        -L length.table -F $sample_name."$A".exons_capped.bed \
+        -L $length_table -F $sample_name."$A".exons_capped.bed \
         -I ${plus_list[@]} ${minus_list[@]} \
         -N ${plus_names[@]} ${minus_names[@]} \
         -O $sample_name."$A".capped.counts.tsv
     
     python $python_dir/bed_feature_coverage.py \
-        -L length.table -F $sample_name."$A".exons_noncapped.bed \
+        -L $length_table -F $sample_name."$A".exons_noncapped.bed \
         -I ${plus_list[@]} ${minus_list[@]} \
         -N ${plus_names[@]} ${minus_names[@]} \
         -O $sample_name."$A".noncapped.counts.tsv
