@@ -279,13 +279,16 @@ do
         | sed 's/\t2$/\tA/' \
         | sed 's/\t1$/\tIA/' \
         | sed 's/\t0$/\tN/' \
-        > $sample_name."$A".all_features.bed
+        > $sample_name."$A".all_features.unsorted.bed
 
-    rm -f $sample_name.gene.bed $sample_name.gene.sorted.bed $sample_name.all.sorted.bed
-    rm -f $sample_name.upstream.bed $sample_name.terminal_exon_overlap.bed $sample_name.is_upstream_of.bed \
+    bedtools sort -i $sample_name."$A".all_features.unsorted.bed | awk  awk '{$4 = "5P."NR; print}' > $sample_name."$A".all_features.bed
+    
+    rm -f $sample_name.gene.bed $sample_name.gene.sorted.bed $sample_name.all.sorted.bed $sample_name.all_features.unsorted.bed \
+        $sample_name.upstream.bed $sample_name.terminal_exon_overlap.bed $sample_name.is_upstream_of.bed \
         $sample_name.internal_exon_overlap.bed $sample_name.nearest_downstream.bed $sample_name.residuals.bed \
         $sample_name.nearest_upstream.bed $sample_name.intronic.bed $sample_name.all_sense.bed $sample_name.antisense.bed \
         $sample_name.anti_upstream_of.bed $sample_name.anti_intronic.bed $sample_name.anti_downstream_of.bed
+    
     ########################################################
     
     
