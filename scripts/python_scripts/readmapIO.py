@@ -25,6 +25,11 @@ parser.add_argument(
     default="BODY", type=str
 )
 parser.add_argument(
+    "-E", "--endtype", dest='ENDTYPE',
+    help="Which end of each read to store (5p or 3p)",
+    default="5p", type=str, choices=['5p','3p']
+)
+parser.add_argument(
     "-F", "--fasta", dest='FASTA',
     help="Genome FASTA file",
     default=None, type=str
@@ -449,9 +454,15 @@ def populate_bedgraphs(read_object,mmIO=args.mmIO):
         readweight = readweight/len(poslist)
         if len(map_positions) > args.MINMATCH:
             if strand == '+':
-                ENDPOINT_end = min(map_positions) - 1
+                if args.ENDTYPE == '5p':
+                    ENDPOINT_end = min(map_positions) - 1
+                else:
+                    ENDPOINT_end = max(map_positions) - 1
             elif strand == '-':
-                ENDPOINT_end = max(map_positions) - 1
+                if args.ENDTYPE == '5p':
+                    ENDPOINT_end = max(map_positions) - 1
+                else:
+                    ENDPOINT_end = min(map_positions) - 1
             
             
             if args.WRITE_BED:
@@ -761,9 +772,15 @@ def assign_multimapper(
             continue
         
         if strand_list[i] == '+':
-            ENDPOINT_end = min(mappos_list[i]) - 1
+            if args.ENDTYPE == '5p':
+                ENDPOINT_end = min(mappos_list[i]) - 1
+            else:
+                ENDPOINT_end = max(mappos_list[i]) - 1
         elif strand_list[i] == '-':
-            ENDPOINT_end = max(mappos_list[i]) - 1
+            if args.ENDTYPE == '5p':
+                ENDPOINT_end = max(mappos_list[i]) - 1
+            else:
+                ENDPOINT_end = min(mappos_list[i]) - 1
         
         if args.WRITE_BED:
             # Write a line to a temp BED file
