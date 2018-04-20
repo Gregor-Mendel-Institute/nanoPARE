@@ -23,6 +23,9 @@ parser.add_argument('--strandline',dest='STRANDLINE',
 parser.add_argument('--scoreline',dest='SCORELINE',
                     help="Which field (0-based) contains score",
                     type=int, default=4)
+parser.add_argument('--only_unique',dest='ONLY_UNIQUE',
+                    help="Suppress writing of all features considered duplicates",
+                    action='store_true', default=False)
 
 args = parser.parse_args()
 args.FIELDS = [int(i) for i in args.FIELDS]
@@ -91,7 +94,7 @@ last_line = None
 duplicate_lines = []
 for line in open(args.INFILE):
     line = line.rstrip()
-    # Make a hash of chromosome_start_end_strand for the current line
+    # Make a hash of all selected fields for the current line
     new_feat = '_'.join([line.split('\t')[i] for i in args.FIELDS])
     if last_line:
         # Check if the new hash is the same as the last hash
@@ -102,10 +105,12 @@ for line in open(args.INFILE):
             continue
         else:
             # Output a single line based on the strand
-            print(output_best(get_unique(duplicate_lines),args.SELECT,args.STARTLINE,args.ENDLINE,args.STRANDLINE,args.SCORELINE))
+            if not args.ONLY_UNIQUE or (args.ONLY_UNIQUE and len(duplicate_lines) == 1):
+                print(output_best(get_unique(duplicate_lines),args.SELECT,args.STARTLINE,args.ENDLINE,args.STRANDLINE,args.SCORELINE))
     
     duplicate_lines = [line]
     last_feat = new_feat
     last_line = line
 
-print(output_best(get_unique(duplicate_lines),args.SELECT,args.STARTLINE,args.ENDLINE,args.STRANDLINE,args.SCORELINE))
+if not args.ONLY_UNIQUE or (args.ONLY_UNIQUE and len(duplicate_lines) == 1):
+    print(output_best(get_unique(duplicate_lines),args.SELECT,args.STARTLINE,args.ENDLINE,args.STRANDLINE,args.SCORELINE))
