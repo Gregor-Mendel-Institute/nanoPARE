@@ -293,7 +293,7 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                         str(start),
                         str(end),
                         name,
-                        str(dompeak)
+                        str(dompeak),
                         strand,
                         str(score),
                     ]
