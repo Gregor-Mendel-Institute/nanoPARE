@@ -121,7 +121,11 @@ for line in feature_file:
     if line[0] == '#':
         continue
     
-    l = line.rstrip().split('\t')
+    l = line.rstrip().split()
+    if len(l) < 5:
+        print("WARNING: <5 columns in {}".format(line.rstrip()))
+        continue
+    
     score = l[4]
     chrom = l[0]
     start_pos = int(l[1])
