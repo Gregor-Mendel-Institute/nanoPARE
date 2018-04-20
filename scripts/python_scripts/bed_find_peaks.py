@@ -191,11 +191,6 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
     for i in bed_dict[chrom]:
         start,end,strand,name,score,other = i
         vector = [coverage[strand][chrom].get(n,0) for n in range(start,end)]
-        if continuous:
-            peaks = find_peaks(vector)
-        else:
-            peaks = sorted_positions(vector)
-        
         if args.trim:
             # set a cutoff of the proportion "trim" of the total score
             target = sum(vector)*float(args.trim)
@@ -218,6 +213,13 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
             
             end = max(nonzeropos)+start+1
             start = min(nonzeropos)+start
+            vector = [coverage[strand][chrom].get(n,0) for n in range(start,end)]
+        
+        if continuous:
+            peaks = find_peaks(vector)
+        else:
+            peaks = sorted_positions(vector)
+        
         
         if len(peaks) == 0:
             dompeak = '.'
@@ -268,20 +270,35 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
             if score < args.threshold:
                 continue
         
-        queue.put(
-            '\t'.join(
-                [
-                    chrom,
-                    str(start),
-                    str(end),
-                    name,
-                    str(score),
-                    strand,
-                    str(dompeak),
-                    other
-                ]
-            ) + '\n'
-        )
+        if other:
+            queue.put(
+                '\t'.join(
+                    [
+                        chrom,
+                        str(start),
+                        str(end),
+                        name,
+                        str(dompeak),
+                        strand,
+                        str(score),
+                        '\t'.join(other)
+                    ]
+                ) + '\n'
+            )
+        else:
+            queue.put(
+                '\t'.join(
+                    [
+                        chrom,
+                        str(start),
+                        str(end),
+                        name,
+                        str(dompeak)
+                        strand,
+                        str(score),
+                    ]
+                ) + '\n'
+            )
         counter += 1
 
 
@@ -344,9 +361,9 @@ for line in file:
     score = l[4]
     strand = l[5]
     if len(l) > 6:
-        other = l[6]
+        other = l[6:]
     else:
-        other = '.'
+        other = None
     
     if chrom not in bed_dict:
         bed_dict[chrom] = []
