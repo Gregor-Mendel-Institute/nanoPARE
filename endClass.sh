@@ -281,7 +281,7 @@ do
         | sed 's/\t0$/\tN/' \
         > $sample_name."$A".all_features.unsorted.bed
 
-    bedtools sort -i $sample_name."$A".all_features.unsorted.bed | awk  awk '{$4 = "5P."NR; print}' > $sample_name."$A".all_features.bed
+    bedtools sort -i $sample_name."$A".all_features.unsorted.bed | awk '{$4 = "5P."NR; print}' > $sample_name."$A".all_features.bed
     
     rm -f $sample_name.gene.bed $sample_name.gene.sorted.bed $sample_name.all.sorted.bed $sample_name.all_features.unsorted.bed \
         $sample_name.upstream.bed $sample_name.terminal_exon_overlap.bed $sample_name.is_upstream_of.bed \
