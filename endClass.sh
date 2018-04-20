@@ -120,14 +120,50 @@ echo "Sample type: $sample_name"
 mkdir -p $data_folder
 cd $data_folder
 
-echo "Setting up exon reference..."
-grep -P "exon\t" $annotation_gff | sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' > exons_by_transcript.gff
-python $python_dir/bed_deduplicate.py -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
-sed 's/\.[0-9]$//' terminal_exons_by_transcript.gff > terminal_exons_by_gene.gff
-grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' > exons_by_gene.gff
-
-awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' exons_by_gene.gff | bedtools sort > exons.bed
-awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' terminal_exons_by_gene.gff | bedtools sort > terminal_exons.bed
+if [ $SETUP == "true" ]
+then
+    echo "Setting up exon reference..."
+    cd $resource_dir
+    echo "   Getting transcript-level exons"
+    grep -P "exon\t" $annotation_gff |\
+        sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
+        sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' > exons_by_transcript.gff
+    
+    echo "   Getting transcript-level CDS"
+    grep -P "CDS\t" $annotation_gff |\
+        sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
+        sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' > CDS_by_transcript.gff
+    echo "   Getting 5'-most exons"
+    python $python_dir/bed_deduplicate.py\
+        -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
+    
+    sed 's/\.[0-9]\{1,\}$//' terminal_exons_by_transcript.gff > terminal_exons_by_gene.gff
+    echo "   Converting transcript-level to gene-level annotations"
+    grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' > exons_by_gene.gff
+    grep -P "CDS\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' > CDS_by_gene.gff
+    
+    echo "   Reformatting to BED file"
+    bedtools sort -i exons_by_gene.gff |\
+            awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
+            bedtools merge -s -nms |\
+            sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+            awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
+            bedtools sort > exons_by_gene.bed
+    
+    bedtools sort -i CDS_by_gene.gff |\
+            awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
+            bedtools merge -s -nms |\
+            sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+            awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
+            bedtools sort > CDS_by_gene.bed
+    
+    echo "   Getting genes with single-exon transcripts"
+    python $python_dir/bed_deduplicate.py \
+        --only_unique exons_by_gene.bed -F 3 > single_exon_genes.bed
+    
+    echo "Setup complete. Annotation files stored in resource directory."
+    exit 0
+fi
 
 ##################
 # MERGE FEATURES #
@@ -207,10 +243,18 @@ do
         -V pass
     
     # Classify features against the annotated list of genes
-    awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
+    # 1: Generate a bed file of 1-nt features representing only the peaks of each 5P feature
+    awk '{ printf $1"\t"$2+$5"\t"$2+$5+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
         $sample_name."$A".peaks.bed | bedtools sort > $sample_name.$A.only_peaks.bed
     bedfile=$sample_name.$A.only_peaks.bed
-
+    
+    # 2: Find the nearest overlapping/downstream exon element in the annotation set
+    bedtools closest -s -id -D b -t first \
+        -a $bedfile \
+        -b terminal_exons_by_gene.gff > $sample_name.terminal.tmp.bed
+    grep -P '\t0$' $sample_name.terminal.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$18"\t"$19"\t6\n" }' > $sample_name.terminal_exon_overlap.bed
+    
+    # 3: Find the nearest overlapping/downstream exon element in the annotation set
     bedtools closest -s -id -D b -t first \
         -a $bedfile \
         -b terminal_exons_by_gene.gff > $sample_name.terminal.tmp.bed
@@ -349,13 +393,6 @@ do
     # Subset 5' end features for only those that are
     # (1) capped, and
     # (2) within 50nt of an existing gene annotation
-    
-    bedtools sort -i exons_by_gene.gff |\
-        awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
-        bedtools merge -s -nms |\
-        sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
-        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-        bedtools sort > exons_by_gene.bed
     
     bedtools subtract -a exons_by_gene.bed -b $sample_name."$A".capped.bed -s > $sample_name."$A".exons_noncapped.bed
     grep -P '\t[PIUD]\t' $sample_name."$A".capped.bed |\
