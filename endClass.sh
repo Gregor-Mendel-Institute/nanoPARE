@@ -121,10 +121,10 @@ mkdir -p $data_folder
 cd $data_folder
 
 echo "Setting up exon reference..."
-grep -P "exon\t" $annotation_gff | sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' | sed 's/Parent=\([^;]*\).*/\1/' > exons_by_transcript.gff
+grep -P "exon\t" $annotation_gff | sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' > exons_by_transcript.gff
 python $python_dir/bed_deduplicate.py -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
 sed 's/\.[0-9]$//' terminal_exons_by_transcript.gff > terminal_exons_by_gene.gff
-grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\([^;\.]*\).*/\1/' > exons_by_gene.gff
+grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' > exons_by_gene.gff
 
 awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' exons_by_gene.gff | bedtools sort > exons.bed
 awk '{printf $1"\t"$4-1"\t"$5"\t"$9"\t"$6"\t"$7"\t"$8"\n"}' terminal_exons_by_gene.gff | bedtools sort > terminal_exons.bed
