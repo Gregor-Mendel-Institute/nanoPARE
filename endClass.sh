@@ -309,7 +309,7 @@ do
     
     bedtools sort -i $sample_name."$A".capped.bed | awk '{ $4="5P.capped."NR; print }' | sed 's/ /\t/g' > $sample_name."$A".capped.sorted.bed
     bedtools sort -i $sample_name."$A".noncapped.bed | awk '{ $4="5P.noncapped."NR; print }' | sed 's/ /\t/g' > $sample_name."$A".noncapped.sorted.bed
-    cat $sample_name."$A".capped.bed $sample_name."$A".noncapped.bed | bedtools sort > $sample_name."$A".5P.bed
+    cat $sample_name."$A".capped.sorted.bed $sample_name."$A".noncapped.sorted.bed | bedtools sort > $sample_name."$A".5P.bed
     
     echo "Cap masking bedgraph files..."
     
