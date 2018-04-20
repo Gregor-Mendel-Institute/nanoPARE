@@ -207,7 +207,7 @@ do
         -V pass
     
     # Classify features against the annotated list of genes
-    awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$7"\n" }'\
+    awk '{ printf $1"\t"$2+$7"\t"$2+$7+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
         $sample_name."$A".peaks.bed | bedtools sort > $sample_name.$A.only_peaks.bed
     bedfile=$sample_name.$A.only_peaks.bed
 
@@ -354,7 +354,7 @@ do
         bedtools sort > exons_by_gene.bed
     
     bedtools subtract -a exons_by_gene.bed -b $sample_name."$A".capped.bed -s > $sample_name."$A".exons_noncapped.bed
-    grep -P '\t[PIUD]_.*$' $sample_name."$A".capped.bed |\
+    grep -P '\t[PIUD]\t' $sample_name."$A".capped.bed |\
         awk '{ printf $1"\t"$2"\t"$3"\t"$7"\t"$5"\t"$6"\n" }' > $sample_name."$A".exons_capped.bed
     
     

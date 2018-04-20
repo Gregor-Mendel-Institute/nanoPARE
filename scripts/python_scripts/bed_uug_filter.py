@@ -127,7 +127,11 @@ for line in feature_file:
     start_pos = int(l[1])
     end_pos = int(l[2])
     # peak_pos = int(l[6]) + start_pos
-    secondary = l[-1]
+    if len(l) > 6:
+        secondary = l[6:]
+    else:
+        secondary = None
+    
     strand = l[5]
     readname = l[3]
 
@@ -223,7 +227,7 @@ for strand in ['+','-']:
 for strand in ['+','-']:
     for chrom in sorted(list(chromosomes)):
         if chrom in features[strand]:
-            for peakpos,feature in features[strand][chrom].items():
+            for currentpos,feature in features[strand][chrom].items():
                 # read feature traits from the dict
                 startend,score,readname,secondary = feature
                 start,end = [int(i) for i in startend]
@@ -255,8 +259,7 @@ for strand in ['+','-']:
                         readname,
                         str(score),
                         strand,
-                        str(int(peakpos)-start),
-                        secondary,
+                        '\t'.join(secondary),
                         str(round(percent_uuG,3))
                     ]
                 ) + '\n'
