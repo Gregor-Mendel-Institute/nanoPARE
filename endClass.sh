@@ -127,20 +127,22 @@ then
     echo "   Getting transcript-level exons"
     grep -P "exon\t" $annotation_gff |\
         sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
-        sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' > exons_by_transcript.gff
+        sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' |\
+        sort -k 9 > exons_by_transcript.gff
     
     echo "   Getting transcript-level CDS"
     grep -P "CDS\t" $annotation_gff |\
         sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
-        sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' > CDS_by_transcript.gff
+        sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' |\
+        sort -k 9 > CDS_by_transcript.gff
     echo "   Getting 5'-most exons"
     python $python_dir/bed_deduplicate.py\
         -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
     
-    sed 's/\.[0-9]\{1,\}$//' terminal_exons_by_transcript.gff > terminal_exons_by_gene.gff
+    sed 's/\.[0-9]\{1,\}$//' terminal_exons_by_transcript.gff | sort -k 9 > terminal_exons_by_gene.gff
     echo "   Converting transcript-level to gene-level annotations"
-    grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' > exons_by_gene.gff
-    grep -P "CDS\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' > CDS_by_gene.gff
+    grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' | sort -k 9 > exons_by_gene.gff
+    grep -P "CDS\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' | sort -k 9 > CDS_by_gene.gff
     
     echo "   Reformatting to BED file"
     bedtools sort -i exons_by_gene.gff |\
@@ -148,14 +150,14 @@ then
             bedtools merge -s -nms |\
             sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
             awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-            bedtools sort > exons_by_gene.bed
+            bedtools sort | sort -k 4 > exons_by_gene.bed
     
     bedtools sort -i CDS_by_gene.gff |\
             awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
             bedtools merge -s -nms |\
             sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
             awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-            bedtools sort > CDS_by_gene.bed
+            bedtools sort | sort -k 4 > CDS_by_gene.bed
     
     echo "   Getting genes with single-exon transcripts"
     python $python_dir/bed_deduplicate.py \
@@ -314,7 +316,7 @@ do
         $sample_name.anti_intronic.bed > $sample_name.gene.bed
     awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t.\t.\t0\n"}' $sample_name."$A".peaks.bed >> $sample_name.gene.bed
     # Add a +-1 buffer to each feature to ensure that untemplated upstream nucleotides are included in the range
-    bedtools sort -i $sample_name.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5-1"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $sample_name.gene.sorted.bed
+    bedtools sort -i $sample_name.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5+1"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $sample_name.gene.sorted.bed
     
     python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.gene.sorted.bed | bedtools sort > $sample_name.all.sorted.bed
     python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $sample_name.all.sorted.bed \
