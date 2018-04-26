@@ -1,0 +1,121 @@
+miRNA	targetAGI	targetName	5'-RACE validation	tissue of 5'RACE experiment	Publication link	Figure
+miR156	AT2G33810	SPL3	yes	shoot apices	http://dev.biologists.org/content/133/18/3539#sec-2	1
+miR156	AT1G53160	SPL4	yes	shoot apices	http://dev.biologists.org/content/133/18/3539#sec-3	1
+miR156	AT3G15270	SPL5	yes	shoot apices	http://dev.biologists.org/content/133/18/3539#sec-4	1
+miR156	AT3G57920	SPL15	yes	seedlings	http://bmcplantbiol.biomedcentral.com/articles/10.1186/1471-2229-12-169	6
+miR156	AT5G43270	SPL2	yes	4-week-old flowering Arabidopsis	http://www.sciencedirect.com/science/article/pii/S153458070300025X	6
+miR156	AT1G69170	SPL6	yes	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR159	AT2G26960 	AtMYB81 	yes	Inflorescence	https://silencejournal.biomedcentral.com/articles/10.1186/1758-907X-1-18#MOESM1	5
+miR159	AT2G32460 	MYB101	yes	Inflorescence	https://silencejournal.biomedcentral.com/articles/10.1186/1758-907X-1-18#MOESM1	5
+miR159	AT2G34010 	unknown 	yes but weak	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR159	AT5G55020 	ATMYB120 	yes	Inflorescence	https://silencejournal.biomedcentral.com/articles/10.1186/1758-907X-1-18#MOESM1	5
+miR319	AT1G30210 	TCP24 	yes	Inflorescence, leaves	https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	4
+miR319	AT1G53230	TCP3 	yes	Inflorescence, leaves	https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	4
+miR319	AT2G31070	TCP10 	yes	Inflorescence, leaves	https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	4
+miR159	AT3G11440 	ATMYB65	yes	Inflorescence, leaves	http://www.sciencedirect.com/science/article/pii/S1534580707001591 , https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	
+miR319	AT3G15030 	TCP4 	yes	Inflorescence, leaves	https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	4
+miR319	AT4G18390 	TCP2 	yes	Inflorescence, leaves	http://www.sciencedirect.com/science/article/pii/S1534580707001591	5
+miR159	AT5G06100	MYB33	yes	Inflorescence, leaves	https://silencejournal.biomedcentral.com/articles/10.1186/1758-907X-1-18#MOESM1 , https://www.nature.com/nature/journal/v425/n6955/full/nature01958.html	5,4
+miR160	AT1G77850	ARF17	yes	Inflorescence , 4-week-old flowering Arabidopsis	http://www.plantcell.org/content/17/5/1360 , http://www.sciencedirect.com/science/article/pii/S153458070300025X	6,1
+miR160	AT2G28350 	ARF10	yes	Inflorescence , 4-week-old flowering Arabidopsis	http://www.plantcell.org/content/17/5/1360, http://www.sciencedirect.com/science/article/pii/S153458070300025X	6,1
+miR160	AT4G30080	ARF16	yes	unclear, most likely whole plant	http://www.plantcell.org/content/17/5/1360	
+miR161	AT1G06580	PPR protein 	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR161	AT1G62910 	PPR protein 	yes	inflorescence tissue of 28-d-old, stage 1 to 12 flowers	http://www.plantcell.org/content/19/3/926.long#sec-11	Supp. 2
+miR161	AT1G63080	PPR protein 	yes	Inflorescence	http://www.pnas.org/content/104/9/3318.full.pdf	4
+miR161	AT1G63130	TPR-like	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	Supp. 2
+miR161	AT1G63150 	TPR-like	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR161	AT1G63230	TPR-like	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR161	AT1G63400	PPR protein	yes	inflorescence tissue of 28-d-old, stage 1 to 12 flowers	http://www.plantcell.org/content/19/3/926.long#sec-11	Supp. 2
+miR161	AT5G41170 	PPR protein	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR162	AT1G01040 	DCL1	yes	unclear	http://www.sciencedirect.com/science/article/pii/S0960982203002811	1
+miR163	AT1G66690 	methyltransferases	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR163	AT1G66700	PXMT1	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR163	AT1G66720	methyltransferases	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR163	AT3G44860	FAMT	yes	Inflorescence	https://www.nature.com/ng/journal/v36/n12/full/ng1478.html	5
+miR164	AT1G56010 	NAC1 	yes	seedlings, roots	http://www.plantcell.org/content/17/5/1376.full	1
+miR164	AT3G15170 	CUC1 	yes	Inflorescence, leaves	http://www.sciencedirect.com/science/article/pii/S153458070300025X	6
+miR164	AT5G07680 	ANAC080 	yes	unclear	http://www.sciencedirect.com/science/article/pii/S0960982204004269	1
+miR164	AT5G53950 	CUC2 	yes	Inflorescence, leaves	http://www.sciencedirect.com/science/article/pii/S153458070300025X	6
+miR164	AT5G61430 	ANAC100 	yes	unclear	http://www.sciencedirect.com/science/article/pii/S0960982204004269	1
+miR166	AT4G32880	ATHB-8 	yes	leaves	http://emboj.embopress.org/content/23/16/3356	3
+miR166	AT1G30490 	PHV 	yes	leaves	http://emboj.embopress.org/content/23/16/3356	3
+miR166	AT1G52150 	ATHB-15/Corona	yes	whole-plants, leaves	http://www.cell.com/fulltext/S0092-8674(13)00404-2 , http://emboj.embopress.org/content/23/16/3356	2,3
+miR166	AT2G34710 	PHB 	yes	whole-plants, leaves	http://www.cell.com/fulltext/S0092-8674(13)00404-2 , http://emboj.embopress.org/content/23/16/3356	2,3
+miR166	AT5G60690 	REV 	yes	whole-plants, leaves	http://www.cell.com/fulltext/S0092-8674(13)00404-2 , http://emboj.embopress.org/content/23/16/3356	2,3
+miR168	AT1G48410 	AGO1	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S0960982204000478	Supp. 1
+miR169	AT1G17590	NF-YA8 	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR169	AT1G54160	NFYA5 	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR169	AT1G72830 	HAP2C	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR169	AT3G05690 	UNE8	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR169	AT3G20910	NF-YA9 	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR169	AT5G06510 	NF-YA10 	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR169	AT5G12840	HAP2A 	only shows up in patent	unclear	https://www.google.com/patents/US20130185818	2A
+miR171	AT2G45160	HAM1	yes	4-week-old flowering Arabidopsis	http://www.sciencedirect.com/science/article/pii/S153458070300025X	3
+miR171	AT3G60630	HAM2	yes	4-week-old flowering Arabidopsis	http://www.sciencedirect.com/science/article/pii/S153458070300025X	3
+miR171	AT4G00150 	HAM3	yes	4-week-old flowering Arabidopsis	http://www.sciencedirect.com/science/article/pii/S153458070300025X	3
+miR172	AT2G39250 	SNZ 	yes	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR172	AT3G54990 	SMZ 	yes	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR172	AT4G36920 	AP2 	yes	Inflorescence	http://www.plantcell.org/content/15/11/2730	2
+miR172	AT5G60120 	TOE2 	yes	Inflorescence	http://www.plantcell.org/content/15/11/2730	2
+miR172	AT5G67180 	TOE3 	yes	Inflorescence	http://www.plantcell.org/content/15/11/2730	2
+miR173	AT1G50055 	TAS1B 	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR173	AT2G27400 	TAS1A 	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR173	AT2G39675 	TAS1C 	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR173	AT2G39681 	TAS2 	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR390	AT3G17185	TAS3a	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR390	AT5G49615	TAS3b	yes	Inflorescence	http://www.plantcell.org/content/19/3/926.full	2
+miR390	AT5G57735	TASIR-ARF	yes	Inflorescence	http://www.plantcell.org/content/19/3/926.full	2
+miR393	AT1G12820	AFB3	yes	Inflorescence	http://www.pnas.org/content/107/9/4477.full	
+miR393	AT3G23690	bHLH	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR393	AT3G26810	AFB2	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR393	AT3G62980	TIR1	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR393	AT4G03190	GRH1	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR394	AT1G27340	Galactose oxidase	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	4
+miR395	AT3G22890	APS1	yes	leaves, roots	http://onlinelibrary.wiley.com/doi/10.1111/j.1365-313X.2008.03690.x/abstract;jsessionid=02130E6260DAF2AB4F752D66194BC31B.f04t02	5
+miR395	AT4G14680	APS3	yes	leaves, roots	http://onlinelibrary.wiley.com/doi/10.1111/j.1365-313X.2008.03690.x/abstract;jsessionid=02130E6260DAF2AB4F752D66194BC31B.f04t02	5
+miR395	AT5G10180	SULTR2	yes	leaves, roots	http://onlinelibrary.wiley.com/doi/10.1111/j.1365-313X.2008.03690.x/abstract;jsessionid=02130E6260DAF2AB4F752D66194BC31B.f04t03	5
+miR395	AT5G43780	APS4	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT2G22840	AtGRF1	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT2G36400	AtGRF3	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT2G40760	phosphatase	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT2G45480	AtGRF9	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT3G52910	AtGRF4	no			
+miR396	AT4G24150	AtGRF8	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT4G37740	AtGRF2	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR396	AT5G24660	LSU2	yes but weak	leaves	http://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1002419	1
+miR396	AT1G10120	CIB4	yes	leaves	http://journals.plos.org/plosgenetics/article?id=10.1371/journal.pgen.1002419#s4	1
+miR396	AT5G53660	AtGRF7	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR397	AT2G29130	LAC2	yes	minus copper grown tissue	http://www.jbc.org/content/283/23/15932.full	5
+miR397	AT2G38080	IRX12	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR397	AT3G60250	CKB3	yes	Inflorescence	https://www.nature.com/nbt/journal/v26/n8/extref/nbt1417-S1.pdf	S3b
+miR397	AT5G60020	LAC17	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR398	AT1G08830	CSD1	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR398	AT2G28190	CSD2	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR398	AT3G15640	Rubredoxin-like	yes	leaves and flowers	http://www.sciencedirect.com/science/article/pii/S1097276504003284	5
+miR399	AT2G33770	UBC24	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+ miR403	AT1G31280	AGO2	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR408	AT2G02850	ARPN	yes	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR408	AT2G30210	LAC3	yes	minus copper grown tissue	http://www.jbc.org/content/283/23/15932	5
+miR447	AT5G60760	AT5G60760 	yes	Inflorescence	http://www.sciencedirect.com/science/article/pii/S0092867405003454	1
+miR472	AT1G51480 	AT1G51480 	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	S1
+miR472	AT5G43740 	AT5G43740 	yes	Inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	S1
+miR773	AT4G14140 	DMT2	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR774	AT3G19890 	F-box protein	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	S2
+miR775	AT1G53290 	Galactosyltransferase	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR778	AT2G22740	SUVH6	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR823	AT1G69770	CMT3	yes	inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR824	AT3G57230	AGL16	yes	inflorescence	http://www.plantcell.org/content/19/8/2417	1
+miR827	AT1G02860	NLA	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR828	AT1G66370	MYB113	yes	siliques or seedlings	http://genesdev.cshlp.org/content/20/24/3407/F5.expansion.html	4
+miR828	TAS4	TAS4	yes	siliques or seedlings	http://genesdev.cshlp.org/content/20/24/3407/F5.expansion.html	4
+miR842	AT5G38550	Mannose-binding	yes according to two references but cannot find it		http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219 , http://nar.oxfordjournals.org/content/37/12/4010.full	table 2, supp. Table 8
+miR844	AT5G51270	U-box domain-containing	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR846	AT5G49850	Mannose-binding lectin	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR857	AT5G41610	ATCHX18	tested but failed	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	table 2
+miR858	AT3G09220	LAC7 	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR858	AT1G06180	AtMYB13	yes	Inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	s3b
+miR858	AT2G47460	MYB12	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
+miR858	AT3G08500	MYB83	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	Table 2
+miR858	At5g49330 	AtMYB111 	yes	inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR858	At1g66230 	AtMYB20	yes	inflorescence	http://www.nature.com/nbt/journal/v26/n8/full/nbt1417.html	S3b
+miR859	AT3G49510	F-box	yes	inflorescence	http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0000219	1
