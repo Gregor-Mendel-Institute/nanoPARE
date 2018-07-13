@@ -64,7 +64,7 @@ if [ -z "$BIAS" ]
 then
     BIAS=false
 fi
-BIAS=true
+#BIAS=true
 
 ############################
 # READING THE COMMAND LINE #
