@@ -14,9 +14,9 @@ parser.add_argument('END_QUANT',
 parser.add_argument('BODY_QUANT',
     help="Path to a background quant table (assumes reads/length/RPM/TPM)."
 )
-parser.add_argument('--baseline', dest='BASELINE',
-    help="Manually set a baseline ratio for end/body fragment number.",
-    default=None, type=float
+parser.add_argument('-F','--fragment_length', dest='FRAGLEN',
+    help="Mean fragment length of the BODY library.",
+    default=200, type=float
 )
 args = parser.parse_args()
 ######################################################################
@@ -33,12 +33,6 @@ def parse_quant_table(quant_table):
         quant[gene] = (float(reads),int(length),float(rpm),float(tpm))
     return quant
 
-if args.BASELINE:
-    baseline = args.BASELINE
-else:
-    #TODO: calculate an estimated baseline empirically
-    baseline = 0.25
-
 end_quant = parse_quant_table(args.END_QUANT)
 body_quant = parse_quant_table(args.BODY_QUANT)
 
@@ -50,10 +44,14 @@ shared_genes = sorted(list(end_genes.intersection(body_genes)))
 # Count the total number of reads mapping to all shared genes
 reads_end = 0
 reads_body = 0
+population_length = float(0)
 for g in shared_genes:
     reads_end += end_quant[g][0]
     reads_body += body_quant[g][0]
+    population_length += body_quant[g][1]*body_quant[g][3]
+
+fragment_ratio = 2*args.FRAGLEN*1000000 / population_length
 
 # Print a scaling factor representing the value of 1 end read
 # relative to 1 body read, given the expected baseline
-print(round(reads_body/(reads_end/baseline),3))
+print(round(fragment_ratio*reads_body/reads_end,4))
