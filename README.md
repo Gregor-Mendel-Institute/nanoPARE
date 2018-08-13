@@ -37,11 +37,13 @@ This script must be run before performing any of the analysis steps for the firs
 To complete setup, you will also need to write an 8-column reference table that gives the pipeline all relevant information about the sequencing files you want to process. You can use the reference table in /resources/reference.table as a guide; the columns should be:  
   
 | row number | directory | FASTQ filename | sample name | sample type | library type (5P or BODY) | sequencing run (SE or PE) | Adapter sequences (comma-separated) |  
+| ---------- | --------- | -------------- | ----------- | ----------- | ------------------------- | ------------------------- | ----------------------------------- |  
+
   
   
 ### 1: EndMap (endMap.sh)  
 INPUTS:  
-..* A reference table formatted as above that includes all the samples you want to process.
+  * A reference table formatted as above that includes all the samples you want to process.
   
 ### 2: EndGraph (endGraph.sh)  
 INPUTS:  
