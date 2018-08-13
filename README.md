@@ -1,4 +1,4 @@
-# nanoPARE
+# nanoPARE Analysis Tools
 A data analysis pipeline companion to Schon, Kellner, et al.:  
 "nanoPARE: Parallel analysis of RNA 5′ ends from low-input RNA"  
   
@@ -25,4 +25,35 @@ To download the repository, go to the desired destination folder and run:
 git clone https://github.com/Gregor-Mendel-Institute/nanoPARE  
 ```
   
-This will install the shell scripts described above, all default configuration files and Python utilities written for the pipeline, and a test dataset representing 1 megabase of the *Arabidopsis thaliana* reference genome and a subset of the data from our manuscript (GEO accession [GSE112869](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE112869))
+This will install the shell scripts described above, all default configuration files and Python utilities written for the pipeline, and a test dataset representing 1 megabase of the *Arabidopsis thaliana* reference genome and a subset of the data from our manuscript (GEO accession [GSE112869](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE112869)). The steps below walk through the example data to show how each stage of the pipeline is run and give some information on the inputs and outputs of each step.  
+  
+  
+### Setup (nanoPARE_setup.sh)  
+INPUTS:  
+  -G|--genome (genome sequence in FASTA format)  
+  -A|--annotation  (gene annotation file in GTF/GFF3 format)  
+  
+This script must be run before performing any of the analysis steps for the first time. During setup, a few reference files are generated for the pipeline to recognize certain features in the reference genome (a multi-FASTA file), and reference transcriptome (a GTF or GFF3 formatted file that is indexed against the reference genome.)  
+To complete setup, you will also need to write an 8-column reference table that gives the pipeline all relevant information about the sequencing files you want to process. You can use the reference table in /resources/reference.table as a guide; the columns should be:  
+  
+| row number | directory | FASTQ filename | sample name | sample type | library type (5P or BODY) | sequencing run (SE or PE) | Adapter sequences (comma-separated) |  
+  
+  
+### 1: EndMap (endMap.sh)  
+INPUTS:  
+..* A reference table formatted as above that includes all the samples you want to process.
+  
+### 2: EndGraph (endGraph.sh)  
+INPUTS:  
+  
+  
+### 3: EndClass (endClass.sh)  
+INPUTS:  
+  
+  
+### 4: EndMask (endMask.sh)  
+INPUTS:  
+  
+  
+### 5: EndCut (endCut.sh)  
+**Not yet fully implemented**  
