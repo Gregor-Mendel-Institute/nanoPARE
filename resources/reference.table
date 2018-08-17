@@ -1,0 +1,6 @@
+1 resources/FASTQ test5P_1.fq.gz flower_1 flower 5P SE nextera
+2 resources/FASTQ testBODY_1.fq.gz flower_1 flower BODY SE nextera
+3 resources/FASTQ test5P_2.fq.gz flower_2 flower 5P SE nextera
+4 resources/FASTQ testBODY_2.fq.gz flower_2 flower BODY SE nextera
+5 resources/FASTQ test5P_3.fq.gz flower_3 flower 5P SE nextera
+6 resources/FASTQ testBODY_3.fq.gz flower_3 flower BODY SE nextera
