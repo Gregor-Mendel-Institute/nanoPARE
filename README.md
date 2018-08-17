@@ -34,19 +34,20 @@ INPUTS:
   **-G|--genome** [file] (genome sequence in FASTA format)  
   **-A|--annotation** [file] (gene annotation file in GTF/GFF3 format)  
   
-This script must be run before performing any of the analysis steps for the first time. During setup, a few reference files are generated for the pipeline to recognize certain features in the reference genome (a multi-FASTA file), and reference transcriptome (a GTF or GFF3 formatted file that is indexed against the reference genome). *nanoPARE_setup.sh* uses these files to (1) find sites of potential strand invasion artifacts and (2) parse out a collection of 5'-most exons from the transcript annotations for comparison.  
+This script must be run before performing any of the analysis steps for the first time. During setup, a few reference files are generated for the pipeline to recognize certain features in the reference genome (a multi-FASTA file), and reference transcriptome (a GTF or GFF3 formatted file that is indexed against the reference genome). *nanoPARE_setup.sh* uses these files to (1) find sites of potential strand invasion artifacts and (2) parse out a collection of 5'-most exons from the transcript annotations for comparison. If no files are provided, the setup will use *resources/genome.fasta* and *resources/annotation.gff*, which are part of the test dataset.  
   
 To complete setup, you will also need to write an 8-column reference table that gives the pipeline all relevant information about the sequencing files you want to process. You can use the reference table in /resources/reference.table as a guide:  
   
 | row number | directory | FASTQ filename | sample name | sample type | library type (5P or BODY) | sequencing run (SE or PE) | Adapter sequences |  
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |  
-| 1 | resources/FASTQ | test5P_1.fq | flower_1 | flower | 5P | SE | nextera |  
-| 2 | resources/FASTQ | testBODY_1.fq | flower_1 | flower | BODY | SE | nextera |  
-| 3 | resources/FASTQ | test5P_2.fq | flower_2 | flower | 5P | SE | nextera |  
-| 4 | resources/FASTQ | testBODY_2.fq | flower_2 | flower | BODY | SE | nextera |  
-
+| 1 | resources/FASTQ | test5P_1.fq.gz | flower_1 | flower | 5P | SE | nextera |  
+| 2 | resources/FASTQ | testBODY_1.fq.gz | flower_1 | flower | BODY | SE | nextera |  
+| 3 | resources/FASTQ | test5P_2.fq.gz | flower_2 | flower | 5P | SE | nextera |  
+| 4 | resources/FASTQ | testBODY_2.fq.gz | flower_2 | flower | BODY | SE | nextera |  
+| 5 | resources/FASTQ | test5P_3.fq.gz | flower_3 | flower | 5P | SE | nextera |  
+| 6 | resources/FASTQ | testBODY_3.fq.gz | flower_3 | flower | BODY | SE | nextera |  
   
-All 5 tools will use this reference table as a lookup. You can either modify the table in this repository (nanoPARE/resources/reference.table) or provide a filepath to your own table using the argument **-R|--reference** for any of the tools listed below. Each step was written so that samples can be processed in parallel, but downstream steps of the pipeline all use files generated in previous steps, so you will need to run each of them in order.  
+All 5 tools will use this reference file as a lookup table. You can either modify the table in this repository (nanoPARE/resources/reference.table) or provide a filepath to your own table using the argument **-R|--reference** for any of the tools listed below. Each step was written so that samples can be processed in parallel, but downstream steps of the pipeline all use files generated in previous steps, so you will need to run each of them in order.  
   
 ### 1: EndMap (endMap.sh)  
 INPUTS:  
