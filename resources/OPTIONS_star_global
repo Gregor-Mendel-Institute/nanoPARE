@@ -23,4 +23,4 @@
 --quantMode GeneCounts \
 --runRNGseed 12345 \
 --runThreadN $CPUS \
---sjdbGTFfile $annotation_gff
+--sjdbGTFfile $ANNOTATION_GFF
