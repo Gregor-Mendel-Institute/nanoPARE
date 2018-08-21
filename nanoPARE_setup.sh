@@ -1,5 +1,35 @@
 #!/bin/bash
 
+function usage() {
+cat <<HELP
+
+### nanoPARE Setup ###
+Usage: ./nanoPARE_setup.sh [options]
+
+Sets up a collection of files required to run the nanoPARE tools:
+ 1) Writes a length.table recording the length of each chromosome in the genome FASTA
+ 2) Generates a STAR genome index using the reference genome and transcriptome
+ 3) Writes a BED file of putative TSO strand invasion sites based on mask_sequences.table
+ 4) Writes a labeled version of the reference genome based on what annotations feature(s) exist
+
+The genome index is written to temp/genome_index.
+Other setup files are added to the resources/ directory.
+
+Optional arguments:
+-R | --reference     Reference table (default: resources/reference.table)
+-G | --genome        Genome FASTA file (default: resources/genome.fasta)
+-A | --annotation    Transcript GFF file (default: resources/annotation.gff)
+--lmod               Load required modules with Lmod (default: false)
+--ram                Amount of available RAM in gigabytes (default: 30)
+--cpus               Number of cores available for multithreaded programs (default: 1)
+
+All steps of this pipeline access the default files for -R, -G, and -A, respectively.
+You can replace these 3 items in the resources folder for simplicity.
+
+HELP
+}
+
+
 ################
 # CONFIG SETUP #
 ################
@@ -10,44 +40,26 @@ then
 fi
 bash_dir=$root_dir/scripts/bash_scripts
 python_dir=$root_dir/scripts/python_scripts
-r_dir=$root_dir/scripts/r_scripts
 resource_dir=$root_dir/resources
 temp_dir=$root_dir/temp
 log_dir=$root_dir/log
 results_dir=$root_dir/results
 genome_index_dir=$temp_dir/genome_index
-ENDMAP_DIR=$results_dir/EndMap
-ENDGRAPH_DIR=$results_dir/EndGraph
+
+. $bash_dir/read_cmdline.sh
 
 # Set defaults for variables if they are not already in the environment
-if [ -z "$JOB_NUMBER" ]
+if [ -z "$GENOME_FASTA" ]
 then
-    JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+    GENOME_FASTA=$resource_dir/genome.fasta # If not already in environment, set as default value
 fi
-if [ -z "$genome_fasta" ]
+if [ -z "$REFERENCE_TABLE" ]
 then
-    genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
+    REFERENCE_TABLE=$resource_dir/reference.table
 fi
-if [ -z "$reference_table" ]
+if [ -z "$ANNOTATION_GFF" ]
 then
-    reference_table=$resource_dir/reference_table_EndGraph.txt
-fi
-if [ -z "$endmap_reference_table" ]
-then
-    endmap_reference_table=$resource_dir/reference_table_EndMap.txt
-fi
-
-if [ -z "$annotation_gff" ]
-then
-    annotation_gff=$resource_dir/annotation.gff
-fi
-if [ -z "$annotation_subset" ]
-then
-    annotation_subset=$resource_dir/annotation_subset.txt
-fi
-if [ -z "$sample_name" ]
-then
-    sample_name="sample"
+    ANNOTATION_GFF=$resource_dir/annotation.gff
 fi
 if [ -z "$LMOD" ]
 then
@@ -57,103 +69,98 @@ if [ -z "$CPUS" ]
 then
     CPUS=1
 fi
-if [ -z "$SETUP" ]
-then
-    SETUP=false
-fi
 
-KERNEL='laplace'
-WEIGHTED='true'
-
-############################
-# READING THE COMMAND LINE #
-############################
-# Taking the default variables above, modifying them with the commandline 
-# arguments (see read_cmdline.sh), and writing a config file
-
-. $bash_dir/read_cmdline.sh
-
-echo "################"
-echo "### ENDGRAPH ###"
-echo "################"
-echo " "
-echo "Config settings:"
 . $bash_dir/list_settings.sh
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools --python )
+REQUIRED_MODULES=( --rna-star --bedtools --python )
 . $bash_dir/load_modules.sh
-echo " "
 
-input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
-input_array=($input_mapper)
-
-line_number=${input_array[0]}  # Line number of reference table (should match job number)
-sample_name=${input_array[1]}  # Name of the positive sample
-body_name=${input_array[2]}    # Name of the background sample
-library_type=${input_array[3]} # Options: 5P, 3P. Type of the positive sample
-
-sample_dir=$ENDGRAPH_DIR/$sample_name
-mkdir -p $sample_dir
-
-
-echo "#######################################"
-echo "### SETUP: GENERATE ANNOTATION INFO ###"
-echo "#######################################"
-echo " "
+cd $root_dir
+echo "####################################"
+echo "### SETUP: GENERATE GENOME INDEX ###"
+echo "####################################"
 # A table of chromosome names and lengths derived from the input FASTA genome file
-length_table_command="python $python_dir/fasta_lengths.py $genome_fasta > $resource_dir/length.table"
+length_table_command="python $python_dir/fasta_lengths.py $GENOME_FASTA > $resource_dir/length.table"
 echo "$length_table_command"
 eval "$length_table_command"
 echo "Length table generated."
+echo " "
+
+length_array=($(cut -f 2 $resource_dir/length.table | tr '\n' ' '))
+genome_length=$(echo ${length_array[@]} | tr ' ' '+' | bc)
+index_base_number=$(echo "l($genome_length)/l(2)/2 -1" | bc -l | cut -d '.' -f 1)
+if [ $index_base_number -gt 14 ]
+then
+    index_base_number=14
+fi
+
+# Genome index required by STAR for short read alignments
+rm -rf $genome_index_dir
+mkdir -p $genome_index_dir
+
+genome_index_command="STAR \
+--runThreadN $CPUS \
+--runMode genomeGenerate \
+--genomeDir $genome_index_dir \
+--outFileNamePrefix $log_dir/setup_phase/ \
+--genomeFastaFiles $GENOME_FASTA \
+--genomeSAindexNbases $index_base_number \
+--sjdbGTFfile $ANNOTATION_GFF"
+
+echo "$genome_index_command"
+eval "$genome_index_command"
+echo "Genome index complete."
+echo " " 
+
+echo "### GENERATE TSO MASKING FILES ###"
 
 python $python_dir/fasta_sequence_search.py \
-    $genome_fasta \
+    $GENOME_FASTA \
     $resource_dir/mask_sequences.table \
     -O $resource_dir
 echo "Masking BED files generated."
+echo " "
 
-echo "Setting up exon reference..."
+echo "### GENERATE ANNOTATION CLASS REFERENCE FILES ###"
+
 cd $resource_dir
 echo "   Getting transcript-level exons"
-grep -P "exon\t" $annotation_gff |\
+grep -P "exon\t" $ANNOTATION_GFF |\
     sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
     sed 's/Parent=\(transcript:\)\?\([^;]*\).*/\2/' |\
-    sort -k 9 > exons_by_transcript.gff
+    sort -k 9 > class.exons_by_transcript.gff
 
-echo "   Getting transcript-level CDS"
-grep -P "CDS\t" $annotation_gff |\
-    sed 's/\t[^\t]*transcript_id=\([^;]*\);.*/\t\1\t/' |\
-    sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' |\
-    sort -k 9 > CDS_by_transcript.gff
 echo "   Getting 5'-most exons"
 python $python_dir/bed_deduplicate.py\
-    -F 8 -S upstream --startline 3 --endline 4 --strandline 6 exons_by_transcript.gff > terminal_exons_by_transcript.gff
+    -F 8 -S upstream --startline 3 --endline 4 --strandline 6 class.exons_by_transcript.gff > class.terminal_exons_by_transcript.gff
 
-sed 's/\.[0-9]\{1,\}$//' terminal_exons_by_transcript.gff | sort -k 9 > terminal_exons_by_gene.gff
+sed 's/\.[0-9]\{1,\}$//' class.terminal_exons_by_transcript.gff | sort -k 9 > class.terminal_exons_by_gene.gff
 echo "   Converting transcript-level to gene-level annotations"
-grep -P "exon\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' | sort -k 9 > exons_by_gene.gff
-grep -P "CDS\t" $annotation_gff | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/\(Parent\|ID\)=\(CDS:\)\?\([^;\.]*\).*/\3/' | sort -k 9 > CDS_by_gene.gff
+grep -P "exon\t" $ANNOTATION_GFF | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/Parent=\(transcript:\)\?\([^;\.]*\).*/\2/' | sort -k 9 > class.exons_by_gene.gff
 
-echo "   Reformatting to BED file"
-bedtools sort -i exons_by_gene.gff |\
-        awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
-        bedtools merge -s -nms |\
-        sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
-        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-        bedtools sort | sort -k 4 > exons_by_gene.bed
+echo "   Reformatting to GFF files to BED files"
+bedtools sort -i class.exons_by_gene.gff |\
+    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
+    bedtools merge -s -nms |\
+    sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
+    bedtools sort | sort -k 4 > class.exons_by_gene.bed
 
-bedtools sort -i CDS_by_gene.gff |\
-        awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
-        bedtools merge -s -nms |\
-        sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
-        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-        bedtools sort | sort -k 4 > CDS_by_gene.bed
+bedtools sort -i class.terminal_exons_by_gene.gff |\
+    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
+    bedtools merge -s -nms |\
+    sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
+    bedtools sort | sort -k 4 > class.terminal_exons_by_gene.bed
 
 echo "   Getting genes with single-exon transcripts"
 python $python_dir/bed_deduplicate.py \
-    --only_unique exons_by_gene.bed -F 3 > single_exon_genes.bed
+    --only_unique class.exons_by_gene.bed -F 3 > class.single_exon_genes.bed
 
+echo "   Cleaning up temporary files"
+rm class.terminal_exons_by_gene.gff class.exons_by_gene.gff
+rm class.terminal_exons_by_transcript.gff class.exons_by_transcript.gff
 
 echo "Setup complete."
 exit 0

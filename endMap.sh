@@ -1,10 +1,33 @@
 #!/bin/bash
 
-# EndMap
-# Aligns RNA-seq reads from 5P or BODY experiments to a reference genome
-# 1) Trims adapter sequences with cutadapt
-# 2) Performs gapped alignment with STAR
-# 3) Converts mapped reads to coverage values with readmapIO
+function usage() {
+cat <<HELP
+
+### EndMap ###
+Usage: ./endMap.sh [options] -L|--line <line_number>
+
+Aligns RNA-seq reads from 5P and/or BODY experiments to a reference genome.
+ 1) Trims adapter sequences with cutadapt
+ 2) Performs gapped alignment with STAR
+ 3) Converts mapped reads to coverage values with readmapIO
+
+Outputs a BEDGRAPH of mapped read 5' ends for both strands of the genome.
+
+Optional arguments:
+-R | --reference     Reference table (default: resources/reference.table)
+-G | --genome        Genome FASTA file (default: resources/genome.fasta)
+-A | --annotation    Transcript GFF file (default: resources/annotation.gff)
+-B | --bias          Perform nucleotide bias correction (default: false)
+--lmod               Load required modules with Lmod (default: false)
+--ram                Amount of available RAM in gigabytes (default: 30)
+--cpus               Number of cores available for multithreaded programs (default: 1)
+--icomp              Minimum i-complexity score to filter reads before mapping (default: 0.15)
+
+All steps of this pipeline access the default files for -R, -G, and -A, respectively.
+You can replace these 3 items in the resources folder for simplicity.
+
+HELP
+}
 
 ################
 # CONFIG SETUP #
@@ -23,30 +46,40 @@ log_dir=$root_dir/log
 results_dir=$root_dir/results
 genome_index_dir=$temp_dir/genome_index
 
-# Set defaults for variables if they are not already in the environment
+############################
+# READING THE COMMAND LINE #
+############################
+# Taking the default environment above, add the commandline
+# arguments (see read_cmdline.sh), and write a config file
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+else
+    . $bash_dir/read_cmdline.sh
+fi
+
+# Set defaults for variables if they are not already in the environment from read_cmdline
 if [ -z "$JOB_NUMBER" ]
 then
-    JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+    if [ -z "${PBS_ARRAY_INDEX}" ]
+    then
+        echo "ERROR: Please input a line number to process from reference.table"
+        exit 1
+    else
+        JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+    fi
 fi
-if [ -z "$genome_fasta" ]
+if [ -z "$GENOME_FASTA" ]
 then
-    genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
+    GENOME_FASTA=$resource_dir/genome.fasta # If not already in environment, set as default value
 fi
-if [ -z "$reference_table" ]
+if [ -z "$REFERENCE_TABLE" ]
 then
-    reference_table=$resource_dir/reference_table_EndMap.txt
+    REFERENCE_TABLE=$resource_dir/reference.table # If not already in environment, set as default value
 fi
-if [ -z "$annotation_gff" ]
+if [ -z "$ANNOTATION_GFF" ]
 then
-    annotation_gff=$resource_dir/annotation.gff
-fi
-if [ -z "$annotation_subset" ]
-then
-    annotation_subset=$resource_dir/annotation_subset.txt
-fi
-if [ -z "$sample_name" ]
-then
-    sample_name="sample"
+    ANNOTATION_GFF=$resource_dir/annotation.gff # If not already in environment, set as default value
 fi
 if [ -z "$LMOD" ]
 then
@@ -56,63 +89,54 @@ if [ -z "$CPUS" ]
 then
     CPUS=1
 fi
-if [ -z "$SETUP" ]
+if [ -z "$RAM" ]
 then
-    SETUP=false
+    RAM=30
 fi
 if [ -z "$BIAS" ]
 then
     BIAS=false
 fi
-#BIAS=true
+if [ -z "$ICOMP" ]
+then
+    ICOMP=0.15
+fi
 
-############################
-# READING THE COMMAND LINE #
-############################
-# Taking the default variables above, modifying them with the commandline 
-# arguments (see read_cmdline.sh), and writing a config file
-
-. $bash_dir/read_cmdline.sh
-
-echo "##############"
-echo "### ENDMAP ###"
-echo "##############"
-echo " "
 echo "Config settings:"
 . $bash_dir/list_settings.sh
-
 
 # Environment modules to load with Lmod (if option --lmod is passed)
 REQUIRED_MODULES=( --bedtools --cutadapt --rna-star --samtools --pysam )
 . $bash_dir/load_modules.sh
 echo " "
 
-input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
+input_mapper=$(sed -n "$JOB_NUMBER"p $REFERENCE_TABLE) #read mapping file
 input_array=($input_mapper)
 
 line_number=${input_array[0]}  # Line number of reference table (should match job number)
 fastq_dir=${input_array[1]}    # Directory containing the fastq file
 input_fastq=${input_array[2]}  # FASTQ filename(s), comma-separated
 sample_name=${input_array[3]}  # Name of the sample
-library_type=${input_array[4]} # Options: BODY, 5P. Type of the FASTQ file
-read_type=${input_array[5]}    # Options: SE, PE, for single end or paired end libraries
-adapter_str=${input_array[6]}  # comma-separated list of sequences to trim from the 3' end of reads
-RAM=30
+sample_type=${input_array[4]}  # Type of sample (samples of like type can be merged)
+library_type=${input_array[5]} # Options: BODY, 5P. Type of the FASTQ file
+read_type=${input_array[6]}    # Options: SE, PE, for single end or paired end libraries
+adapter_str=${input_array[7]}  # comma-separated list of sequences to trim from the 3' end of reads
 minimum_readlength=16
 minimum_pairlength=16
-sample_dir=$temp_dir/$sample_name
+sample_dir=$temp_dir/$sample_name.$library_type
 
 echo "Parsed reference table:"
 echo "Line number: $line_number"
 echo "FASTQ directory: $fastq_dir"
 echo "FASTQ file name: $input_fastq"
 echo "Sample name: $sample_name"
+echo "Sample type: $sample_type"
 echo "Library type: $library_type"
 echo "Read type: $read_type"
 echo "Adapter sequence(s): $adapter_str"
 
 mkdir -p $temp_dir/star
-temp_dir_s=$temp_dir/star/$sample_name
+temp_dir_s=$temp_dir/star/$sample_name.$library_type
 rm -rf $temp_dir_s
 OPTIONS_star_global=$(cat $resource_dir/OPTIONS_star_global)
 
@@ -143,7 +167,6 @@ then
 fi
 
 #########################
-
 ### EXECUTE COMMANDS ###
 echo "### PHASE 1: STAGE-SPECIFIC FASTQ FILE ASSEMBLY AND ADAPTER TRIMMING ###"
 # Parse $input_fastq to determine:
@@ -228,11 +251,14 @@ echo "Trimming transposase adapters with cutadapt:"
 cd $sample_dir
 
 # Trim 0, 1, or 2 provided adapter sequences
-
 keep_untrimmed="true"
 
 if [[ $library_type == "5P" ]]
 then
+    if [ $adapter_str == "nextera" ]
+    then
+        adapter_str="CTGTCTCTTATACACATCTGACGCTGCCGACGA,CTGTCTCTTATACACATCTCCGAGCCCACGAGAC"
+    fi
     adapters=( $(echo $adapter_str | tr "," " ") )
     number_of_adapters=${#adapters[@]}
     echo "Adapters: ${adapters[@]}"
@@ -286,11 +312,15 @@ then
     echo "Adapter trimming complete."
 
     echo "Filtering out low-complexity reads..."
-    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq 0.15
+    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq $ICOMP
 #    cat "$sample_name"_cleaned.fastq > "$sample_name"_cleaned.1.fastq
     rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
+    if [ $adapter_str == "nextera" ]
+    then
+        adapter_str="TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG,GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG"
+    fi
     adapters=( $(echo $adapter_str | tr "," " ") )
     echo "Adapters: ${adapters[@]}"
     TN5_1=${adapters[0]}
@@ -338,10 +368,10 @@ then
     cd $sample_dir
     samtools view -h star/Aligned.out.bam > full.unsorted.sam
     #TODO: Fix module control, update so all scripts are Python3+ compatible
-    ml Python/3.5.2-foss-2016b    
+    ml Python/3.5.2-foss-2016b
     python $python_dir/sam_subset.py \
-        -F $genome_fasta \
-        -A $annotation_gff \
+        -F $GENOME_FASTA \
+        -A $ANNOTATION_GFF \
         -I full.unsorted.sam \
         --feature CDS \
         --nucfreqs \
@@ -406,86 +436,76 @@ else
     samtools view -h star/Aligned.out.bam > $sample_name.sam
 fi
 
-if [[ $library_type == "5P" ]]
+if [[ $BIAS == "true" ]]
 then
-    python $python_dir/readmapIO.py \
-        -S "$sample_name" \
-        -I "$sample_name".sam \
-        -R $library_type \
-        -F $genome_fasta \
-        --softclip_type 5p \
-        --untemp_out A C G T \
-        --secondary \
-        --allow_naive
-    
-    python $python_dir/readmapIO.py \
-        -S "$sample_name".W \
-        -I "$sample_name".sam \
-        -R $library_type \
-        -F $genome_fasta \
-        --softclip_type 5p \
-        --untemp_out A C G T \
-        --secondary \
-        --allow_naive \
-        --weighted
-
+    if [[ $library_type == "5P" ]]
+    then
+        python $python_dir/readmapIO.py \
+            -S "$sample_name" \
+            -I "$sample_name".sam \
+            -R $library_type \
+            -F $GENOME_FASTA \
+            --softclip_type 5p \
+            --untemp_out G \
+            --secondary \
+            --allow_naive \
+            --weighted
+    else
+        python $python_dir/readmapIO.py \
+            -S "$sample_name" \
+            -I "$sample_name".sam \
+            -R $library_type \
+            -F $GENOME_FASTA \
+            --secondary \
+            --allow_nonstranded \
+            --allow_naive \
+            --weighted    
+    fi
 else
-    python $python_dir/readmapIO.py \
-        -S "$sample_name" \
-        -I "$sample_name".sam \
-        -R $library_type \
-        -F $genome_fasta \
-        --secondary \
-        --allow_nonstranded \
-        --allow_naive
-        
-    python $python_dir/readmapIO.py \
-        -S "$sample_name".W \
-        -I "$sample_name".sam \
-        -R $library_type \
-        -F $genome_fasta \
-        --secondary \
-        --allow_nonstranded \
-        --allow_naive \
-        --weighted
-
+    if [[ $library_type == "5P" ]]
+    then
+        python $python_dir/readmapIO.py \
+            -S "$sample_name" \
+            -I "$sample_name".sam \
+            -R $library_type \
+            -F $GENOME_FASTA \
+            --softclip_type 5p \
+            --untemp_out G \
+            --secondary \
+            --allow_naive
+    else
+        python $python_dir/readmapIO.py \
+            -S "$sample_name" \
+            -I "$sample_name".sam \
+            -R $library_type \
+            -F $GENOME_FASTA \
+            --secondary \
+            --allow_nonstranded \
+            --allow_naive
+    fi
 fi
 
-# rm "$sample_name".sam 
+rm "$sample_name".sam 
 
-bedtools sort -i "$sample_name"_"$library_type"_plus.bedgraph > "$sample_name"_plus.bedgraph
-bedtools sort -i "$sample_name"_"$library_type"_minus.bedgraph > "$sample_name"_minus.bedgraph
+bedtools sort -i "$sample_name"_"$library_type"_plus.bedgraph > $sample_name.$library_type.plus.bedgraph
+bedtools sort -i "$sample_name"_"$library_type"_minus.bedgraph > $sample_name.$library_type.minus.bedgraph
 
 if [[ $library_type == "5P" ]]
 then
     bedtools sort -i "$sample_name"_"$library_type"_plus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_plus.uG.bedgraph
+        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\n" }' > $sample_name.uG.plus.bedgraph
     bedtools sort -i "$sample_name"_"$library_type"_minus_untemp.bedgraph | \
-        awk '{ printf $1"\t"$2"\t"$3"\t"$6"\n" }' > "$sample_name"_minus.uG.bedgraph
-    # Calculate transcript_level coverage by parsing the genome coverage values
-    python $python_dir/bedgraph_genome_to_transcripts.py \
-        --subset $annotation_subset \
-        --output "$sample_name"_transcript.bedgraph \
-        "$sample_name"_plus.bedgraph \
-        "$sample_name"_minus.bedgraph \
-        $annotation_gff \
-        $genome_fasta
+        awk '{ printf $1"\t"$2"\t"$3"\t"$4"\n" }' > $sample_name.uG.minus.bedgraph
 else
-    # Calculate transcript_level coverage by parsing the genome coverage values
-    python $python_dir/bedgraph_genome_to_transcripts.py \
-        --subset $annotation_subset \
-        --output "$sample_name"_transcript.bedgraph \
-        "$sample_name"_minus.bedgraph \
-        "$sample_name"_plus.bedgraph \
-        $annotation_gff \
-        $genome_fasta
-    
+    python $python_dir/bedgraph_combine.py \
+        -i "$sample_name"_"$library_type"_plus_coverage.bedgraph "$sample_name"_"$library_type"_minus_coverage.bedgraph \
+        -o $sample_name.$library_type.cov.bedgraph
 fi
 
 rm "$sample_name"_"$library_type"_plus.bedgraph \
     "$sample_name"_"$library_type"_minus.bedgraph
 
-# rm "$sample_name"*coverage.bedgraph
+rm "$sample_name"*coverage.bedgraph
 
 echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$sample_name

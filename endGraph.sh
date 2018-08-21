@@ -1,11 +1,34 @@
 #!/bin/bash
 
-# EndGraph
-# Identification of end features through subtractive kernel density estimation
-# 1) Determines a scaling factor to adjust read depths of 5P/3P and BODY libraries
-# 2) Signal smoothing by fitting a kernel to END - BODY read values
-# 3) Convert continuous regions of positive signal to features in a BED file
-# Expects EndMap to be run and the results in the directory /results/EndMap/
+function usage() {
+cat <<HELP
+
+### EndGraph ###
+Usage: ./endGraph.sh [options] -N|--name <sample_name>
+
+Identification of end features through subtractive kernel density estimation
+ 1) Determines a scaling factor to adjust read depths of 5P and BODY libraries
+ 2) Smooths signal by fitting a Laplace kernel to END - BODY read values
+ 3) Converts continuous regions of positive signal to features in a BED file
+
+Expects EndMap to be run and the results for sample_name in the directory /results/EndMap/sample_name
+
+Optional arguments:
+-R | --reference     Reference table (default: resources/reference.table)
+-G | --genome        Genome FASTA file (default: resources/genome.fasta)
+-A | --annotation    Transcript GFF file (default: resources/annotation.gff)
+--lmod               Load required modules with Lmod (default: false)
+--cpus               Number of cores available for multithreaded programs (default: 1)
+--kernel             Type of kernel to use for density estimation (default: laplace. options: gaussian, laplace)
+--bandwidth          Bandwidth of kernel to use, in nucleotides (default: 15)
+--fraglen            Mean fragment length of cDNA library, in nucleotides (default: 200)
+--rpm                Minimum RPM required to keep a feature (default: 0.5)
+
+All steps of this pipeline access the default files for -R, -G, and -A, respectively.
+You can replace these 3 items in the resources folder for simplicity.
+
+HELP
+}
 
 ################
 # CONFIG SETUP #
@@ -26,35 +49,39 @@ genome_index_dir=$temp_dir/genome_index
 ENDMAP_DIR=$results_dir/EndMap
 ENDGRAPH_DIR=$results_dir/EndGraph
 
+############################
+# READING THE COMMAND LINE #
+############################
+# Taking the default environment above, add the commandline
+# arguments (see read_cmdline.sh), and write a config file
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+else
+    . $bash_dir/read_cmdline.sh
+fi
+
 # Set defaults for variables if they are not already in the environment
+if [ -z "$SAMPLE_NAME" ]
+then
+    echo "ERROR: Please input a sample name (-N|--name)"
+    exit 1
+fi
 if [ -z "$JOB_NUMBER" ]
 then
     JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
 fi
-if [ -z "$genome_fasta" ]
+if [ -z "$GENOME_FASTA" ]
 then
-    genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
+    GENOME_FASTA=$resource_dir/genome.fasta # If not passed already in environment, set as default value
 fi
-if [ -z "$reference_table" ]
+if [ -z "$REFERENCE_TABLE" ]
 then
-    reference_table=$resource_dir/reference_table_EndGraph.txt
+    REFERENCE_TABLE=$resource_dir/reference.table
 fi
-if [ -z "$endmap_reference_table" ]
+if [ -z "$ANNOTATION_GFF" ]
 then
-    endmap_reference_table=$resource_dir/reference_table_EndMap.txt
-fi
-
-if [ -z "$annotation_gff" ]
-then
-    annotation_gff=$resource_dir/annotation.gff
-fi
-if [ -z "$annotation_subset" ]
-then
-    annotation_subset=$resource_dir/annotation_subset.txt
-fi
-if [ -z "$sample_name" ]
-then
-    sample_name="sample"
+    ANNOTATION_GFF=$resource_dir/annotation.gff
 fi
 if [ -z "$LMOD" ]
 then
@@ -64,26 +91,23 @@ if [ -z "$CPUS" ]
 then
     CPUS=1
 fi
-if [ -z "$SETUP" ]
+if [ -z "$FRAGLEN" ]
 then
-    SETUP=false
+    FRAGLEN=200
+fi
+if [ -z "$BANDWIDTH" ]
+then
+    BANDWIDTH=15
+fi
+if [ -z "$RPM" ]
+then
+    RPM=0.5
+fi
+if [ -z "$KERNEL" ]
+then
+    KERNEL='laplace'
 fi
 
-KERNEL='laplace'
-WEIGHTED='true'
-
-############################
-# READING THE COMMAND LINE #
-############################
-# Taking the default variables above, modifying them with the commandline 
-# arguments (see read_cmdline.sh), and writing a config file
-
-. $bash_dir/read_cmdline.sh
-
-echo "################"
-echo "### ENDGRAPH ###"
-echo "################"
-echo " "
 echo "Config settings:"
 . $bash_dir/list_settings.sh
 
@@ -92,37 +116,8 @@ REQUIRED_MODULES=( --bedtools --python )
 . $bash_dir/load_modules.sh
 echo " "
 
-input_mapper=$(sed -n "$JOB_NUMBER"p $reference_table) #read mapping file
-input_array=($input_mapper)
-
-line_number=${input_array[0]}  # Line number of reference table (should match job number)
-sample_name=${input_array[1]}  # Name of the positive sample
-body_name=${input_array[2]}    # Name of the background sample
-library_type=${input_array[3]} # Options: 5P, 3P. Type of the positive sample
-
-sample_dir=$ENDGRAPH_DIR/$sample_name
+sample_dir=$ENDGRAPH_DIR/$SAMPLE_NAME
 mkdir -p $sample_dir
-
-if [ $SETUP == "true" ]
-then
-    echo "#######################################"
-    echo "### SETUP: GENERATE ANNOTATION INFO ###"
-    echo "#######################################"
-    echo " "
-    # A table of chromosome names and lengths derived from the input FASTA genome file
-    length_table_command="python $python_dir/fasta_lengths.py $genome_fasta > $resource_dir/length.table"
-    echo "$length_table_command"
-    eval "$length_table_command"
-    echo "Length table generated."
-
-    python $python_dir/fasta_sequence_search.py \
-        $genome_fasta \
-        $resource_dir/mask_sequences.table \
-        -O $resource_dir
-    echo "Masking BED files generated."
-    echo "Setup complete."
-    exit 0
-fi
 
 ### STEP 1: BEDGRAPH ARTIFACT MASKING ###
 echo "#########################################"
@@ -139,66 +134,40 @@ echo " "
 # /resources/mask_sequences.table
 
 #TODO: Update behavior for $library_type == 5P or 3P
+library_type="5P"
 
 # Copy background bedgraph files from results/EndMap
-cat $ENDMAP_DIR/$body_name/"$body_name"_plus.bedgraph > $sample_dir/BODY.R_plus.bedgraph
-cat $ENDMAP_DIR/$body_name/"$body_name"_minus.bedgraph > $sample_dir/BODY.R_minus.bedgraph
-if [ $WEIGHTED == "true" ]
-then
-    cat $ENDMAP_DIR/$body_name/"$body_name".W_BODY_plus.bedgraph > $sample_dir/BODY.W_plus.bedgraph
-    cat $ENDMAP_DIR/$body_name/"$body_name".W_BODY_minus.bedgraph > $sample_dir/BODY.W_minus.bedgraph
-fi
+cat $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".BODY.plus.bedgraph > $sample_dir/BODY.plus.bedgraph
+cat $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".BODY.minus.bedgraph > $sample_dir/BODY.minus.bedgraph
 
 # Copy 5P/3P begraph files from results/EndMap
 if [ $library_type == "5P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $ENDMAP_DIR/$sample_name/"$sample_name"_plus.bedgraph \
-        -M $ENDMAP_DIR/$sample_name/"$sample_name"_minus.bedgraph \
-        -PO $sample_dir/5P.R_plus_mask.bedgraph \
-        -MO $sample_dir/5P.R_minus_mask.bedgraph \
+        -P $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".5P.plus.bedgraph \
+        -M $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".5P.minus.bedgraph \
+        -PO $sample_dir/5P.plus_mask.bedgraph \
+        -MO $sample_dir/5P.minus_mask.bedgraph \
         -U $resource_dir/5P_mask_up.bed \
         -L $resource_dir/length.table
     
     python $python_dir/bedgraph_mask.py \
-        -P $ENDMAP_DIR/$sample_name/"$sample_name"_plus.uG.bedgraph \
-        -M $ENDMAP_DIR/$sample_name/"$sample_name"_minus.uG.bedgraph \
-        -PO $sample_dir/uuG_plus_mask.bedgraph \
-        -MO $sample_dir/uuG_minus_mask.bedgraph \
+        -P $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".uG.plus.bedgraph \
+        -M $ENDMAP_DIR/$SAMPLE_NAME/"$SAMPLE_NAME".uG.minus.bedgraph \
+        -PO $sample_dir/uG.plus_mask.bedgraph \
+        -MO $sample_dir/uG.minus_mask.bedgraph \
         -U $resource_dir/5P_mask_up.bed \
         -L $resource_dir/length.table
-    
-    if [ $WEIGHTED == "true" ]
-    then
-        python $python_dir/bedgraph_mask.py \
-            -P $ENDMAP_DIR/$sample_name/"$sample_name".W_5P_plus.bedgraph \
-            -M $ENDMAP_DIR/$sample_name/"$sample_name".W_5P_minus.bedgraph \
-            -PO $sample_dir/5P.W_plus_mask.bedgraph \
-            -MO $sample_dir/5P.W_minus_mask.bedgraph \
-            -U $resource_dir/5P_mask_up.bed \
-            -L $resource_dir/length.table
-    fi
 fi
 if [ $library_type == "3P" ]
 then
     python $python_dir/bedgraph_mask.py \
-        -P $sample_dir/"$sample_name"_plus.bedgraph \
-        -M $sample_dir/"$sample_name"_minus.bedgraph \
-        -PO $sample_dir/3P.R_plus_mask.bedgraph \
-        -MO $sample_dir/3P.R_minus_mask.bedgraph \
+        -P $sample_dir/"$SAMPLE_NAME".3P.plus.bedgraph \
+        -M $sample_dir/"$SAMPLE_NAME".3P.minus.bedgraph \
+        -PO $sample_dir/3P.plus_mask.bedgraph \
+        -MO $sample_dir/3P.minus_mask.bedgraph \
         -D $resource_dir/3P_mask_down.bed \
         -L $resource_dir/length.table
-    
-    if [ $WEIGHTED == "true" ]
-    then
-        python $python_dir/bedgraph_mask.py \
-            -P $ENDMAP_DIR/$sample_name/"$sample_name".W_3P_plus.bedgraph \
-            -M $ENDMAP_DIR/$sample_name/"$sample_name".W_3P_minus.bedgraph \
-            -PO $sample_dir/3P.W_plus_mask.bedgraph \
-            -MO $sample_dir/3P.W_minus_mask.bedgraph \
-            -U $resource_dir/3P_mask_down.bed \
-            -L $resource_dir/length.table
-    fi
 fi
 
 echo "Step 1 complete."
@@ -208,194 +177,152 @@ echo "####################################################################"
 echo "### STEP 2: PARAMETER ESTIMATION WITH SUBTRACTIVE BEDGRAPH FILES ###"
 echo "####################################################################"
 echo " "
-# Performs a meta-analysis of annotated transcripts to determine 2 parameters:
-#     Optimal bandwidth for kernel density estimation
+# Performs a meta-analysis of annotated transcripts to determine:
 #     Scaling factor to adjust for capture efficiency of 5P/3P/BODY reads
-#
-# Generates four scaled subtractive bedgraph files:
-#     5Pplus  - BODYminus
-#     5Pminus - BODYplus
-#     3Pplus  - BODYplus
-#     3Pminus - BODYminus
 
 scale=1
 SCALE_CAP=10
 BANDWIDTH_CAP=30
-bandwidth=15
 
 flip_5p="true"
-if [ $WEIGHTED == "true" ]
+if [[ $library_type == "5P" ]]
 then
-    ADJUSTMENT=( "R" )
+    if [[ $flip_5p == "true" ]]
+    then
+        bg_plus=$sample_dir/BODY.minus.bedgraph
+        bg_minus=$sample_dir/BODY.plus.bedgraph
+    else
+        bg_plus=$sample_dir/BODY.plus.bedgraph
+        bg_minus=$sample_dir/BODY.minus.bedgraph    
+    fi
 else
-    ADJUSTMENT=( "R" "W" )
+    bg_plus=$sample_dir/BODY.plus.bedgraph
+    bg_minus=$sample_dir/BODY.minus.bedgraph
 fi
 
-for A in ${ADJUSTMENT[@]}
+# Write quantification tables for scaling factor estimation
+python $python_dir/gtf_quantify.py \
+    -A $ANNOTATION_GFF \
+    -P $sample_dir/"$library_type".plus_mask.bedgraph
+    -M $sample_dir/"$library_type".minus_mask.bedgraph
+    --norm reads length RPM TPM \
+    --buffer 100 \
+    --gene > $sample_dir/"$SAMPLE_NAME"."$library_type".quant.tsv
+
+python $python_dir/gtf_quantify.py \
+    -A $ANNOTATION_GFF \
+    -P $bg_plus
+    -M $bg_minus
+    --norm reads length RPM TPM \
+    --buffer 100 \
+    --gene > $sample_dir/"$SAMPLE_NAME".bg.quant.tsv
+
+# Perform scaling based on quantification tables above
+python $python_dir/endgraph_ratio.py \
+    $sample_dir/"$SAMPLE_NAME"."$library_type".quant.tsv
+    $sample_dir/"$SAMPLE_NAME".bg.quant.tsv
+    -F $FRAGLEN > $sample_dir/scaling_factor.txt
+
+scale=$(cat $sample_dir/scaling_factor.txt)
+
+if [ $(echo "$scale > $SCALE_CAP" | bc -l) -eq 1 ]
+then    
+    scale=$SCALE_CAP
+    echo "Hit scale cap of $SCALE_CAP"
+fi
+
+if [ $(echo "$BANDWIDTH > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
+then
+    BANDWIDTH=$BANDWIDTH_CAP
+    echo "Cannot exceed bandwidth cap of $BANDWIDTH_CAP"
+fi
+
+python $python_dir/bedgraph_combine.py \
+    -i $sample_dir/"$library_type".plus_mask.bedgraph $bg_plus  \
+    -s $scale -1 \
+    -o $sample_dir/"$library_type".plus_subtract.bedgraph
+
+python $python_dir/bedgraph_combine.py \
+    -i $sample_dir/"$library_type".minus_mask.bedgraph $bg_minus \
+    -s $scale -1 \
+    -o $sample_dir/"$library_type".minus_subtract.bedgraph
+
+### STEP 3: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
+echo "#########################################################"
+echo "### STEP 3: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###"
+echo "#########################################################"
+echo " "
+# Takes the two subtractive BEDGRAPH files generated in Step 2
+# and smooths them using a continous kernel function.
+# See the Python util "bedgraph_kernel_density.py" for full details.
+# Defaults to a summed Laplace distribution smoothing
+
+for strand in plus minus
 do
-    if [[ $library_type == "5P" ]]
-    then
-        if [[ $flip_5p == "true" ]]
-        then
-            bg_plus=$sample_dir/BODY."$A"_minus.bedgraph
-            bg_minus=$sample_dir/BODY."$A"_plus.bedgraph
-        else
-            bg_plus=$sample_dir/BODY."$A"_plus.bedgraph
-            bg_minus=$sample_dir/BODY."$A"_minus.bedgraph    
-        fi
-    else
-        bg_plus=$sample_dir/BODY."$A"_plus.bedgraph
-        bg_minus=$sample_dir/BODY."$A"_minus.bedgraph
-    fi
-    
-    # Write quantification tables for scaling factor estimation
-    python $python_dir/gtf_quantify.py \
-        -A $annotation_gff \
-        -P $sample_dir/"$library_type"."$A"_plus_mask.bedgraph
-        -M $sample_dir/"$library_type"."$A"_minus_mask.bedgraph
-        --norm reads length RPM TPM \
-        --buffer 100 \
-        --gene > $sample_dir/"$sample_name"."$library_type"."$A".quant.tsv
-    
-    python $python_dir/gtf_quantify.py \
-        -A $annotation_gff \
-        -P $bg_plus
-        -M $bg_minus
-        --norm reads length RPM TPM \
-        --buffer 100 \
-        --gene > $sample_dir/"$sample_name".bg."$A".quant.tsv
-    
-    # Perform scaling based on quantification tables above
-    python $python_dir/endgraph_ratio.py \
-        $sample_dir/"$sample_name"."$library_type"."$A".quant.tsv
-        $sample_dir/"$sample_name".bg."$A".quant.tsv
-        --baseline 0.25 > $sample_dir/scaling_factor."$A".txt
-    
-    scale=$(cat $sample_dir/scaling_factor."$A".txt)
-    
-    #python $python_dir/bedgraph_rescale.py \
-    #    -P $sample_dir/"$library_type"_plus_mask.bedgraph \
-    #    -N $bg_plus \
-    #    -A $annotation_gff \
-    #    -S + \
-    #    --position $library_type \
-    #    --align \
-    #    > $sample_dir/"$library_type"_scale_plus.txt
-    #
-    #python $python_dir/bedgraph_rescale.py \
-    #    -P $sample_dir/"$library_type"_minus_mask.bedgraph \
-    #    -N $bg_minus \
-    #    -A $annotation_gff \
-    #    -S - \
-    #    --align \
-    #    --position $library_type \
-    #    > $sample_dir/"$library_type"_scale_minus.txt
-    #
-    #plus_scales=( $(tail -n 1 $sample_dir/"$library_type"_scale_plus.txt) )
-    #minus_scales=( $(tail -n 1 $sample_dir/"$library_type"_scale_minus.txt) )
-    #scale=$(printf "%.2f" $(echo "(${plus_scales[0]} + ${minus_scales[0]}) / 2" | bc -l))
-    #bandwidth=$(printf "%.0f" $(echo "(${plus_scales[1]} + ${minus_scales[1]}) / 2" | bc -l))
-    
-    if [ $(echo "$scale > $SCALE_CAP" | bc -l) -eq 1 ]
-    then    
-        scale=$SCALE_CAP
-        echo "hit scale cap of $SCALE_CAP"
-    fi
-    
-    if [ $(echo "$bandwidth > $BANDWIDTH_CAP" | bc -l) -eq 1 ]
-    then
-        bandwidth=$BANDWIDTH_CAP
-        echo "hit bandwidth cap of $BANDWIDTH_CAP"
-    fi
-    
-    python $python_dir/bedgraph_combine.py \
-        -i $sample_dir/"$library_type"."$A"_plus_mask.bedgraph $bg_plus  \
-        -s $scale -1 \
-        -o $sample_dir/"$library_type"."$A"_plus_subtract.bedgraph
-    
-    python $python_dir/bedgraph_combine.py \
-        -i $sample_dir/"$library_type"."$A"_minus_mask.bedgraph $bg_minus \
-        -s $scale -1 \
-        -o $sample_dir/"$library_type"."$A"_minus_subtract.bedgraph
-    
-    ### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###
-    echo "#########################################################"
-    echo "### PHASE 3.4: CONTINUOUS KERNEL DENSITY DISTRIBUTION ###"
-    echo "#########################################################"
-    echo " "
-    # Takes the four subtractive BEDGRAPH files generated in PHASE 3 
-    # and smooths them using a continous kernel function.
-    # See the Python util "bedgraph_kernel_density.py" for full details.
-    # Defaults to a summed Laplace distribution smoothing
-    
-    for strand in plus minus
-    do
-        kernel_density_command="python \
-            $python_dir/bedgraph_kernel_density.py \
-            -B=$sample_dir/"$library_type"."$A"_"$strand"_subtract.bedgraph \
-            -O=$sample_dir/"$library_type"."$A"_"$strand"_smooth.bedgraph \
-            -L=$resource_dir/length.table \
-            -K=$KERNEL \
-            -H=$bandwidth \
-            -S=3 \
-            -D=3 \
-            -P \
-            -c $CPUS"
-        echo $kernel_density_command
-        eval $kernel_density_command
-        if [ ! -f $sample_dir/"$library_type"."$A"_"$strand"_smooth.bedgraph ]
-        then
-            echo "ERROR: Failed to generate "$library_type"."$A"_"$strand"_smooth.bedgraph"
-            exit 1
-        fi
-        feature_threshold_command="python \
-        $python_dir/bedgraph_thresh_to_bed.py \
-        -B $sample_dir/"$library_type"."$A"_"$strand"_smooth.bedgraph \
-        -O $sample_dir/"$library_type"."$A"_"$strand"_features.bed \
+    kernel_density_command="python \
+        $python_dir/bedgraph_kernel_density.py \
+        -B $sample_dir/"$library_type"."$strand"_subtract.bedgraph \
+        -O $sample_dir/"$library_type"."$strand"_smooth.bedgraph \
         -L $resource_dir/length.table \
-        -T 0 \
-        -M 10 \
-        -V sum \
-        -S $strand"
-        echo $feature_threshold_command
-        eval $feature_threshold_command
-        if [ ! -f $sample_dir/"$library_type"."$A"_"$strand"_features.bed ]
-        then
-            echo "ERROR: Failed to generate "$library_type"."$A"_"$strand"_features.bed"
-            exit 1
-        fi
-    done
-    
-    # Merges all end features identified in PHASE 3.4 to a single BED file.
-    rm -f $sample_dir/end_features_temp.bed
-    touch $sample_dir/end_features_temp.bed
-    sed 's/thresh./'$library_type'.plus./' $sample_dir/"$library_type"."$A"_plus_features.bed \
-        >> $sample_dir/end_features_temp.bed
-    sed 's/thresh./'$library_type'.minus./' $sample_dir/"$library_type"."$A"_minus_features.bed \
-        >> $sample_dir/end_features_temp.bed
-    
-    bedtools sort -i $sample_dir/end_features_temp.bed > $sample_dir/end_features."$A".bed
-    
-    python $python_dir/bed_find_peaks.py \
-        -I $sample_dir/end_features."$A".bed \
-        -L $resource_dir/length.table \
-        -O $sample_dir/$sample_name.rpm.features.bed \
-        -BP $sample_dir/"$library_type"."$A"_plus_mask.bedgraph \
-        -BM $sample_dir/"$library_type"."$A"_minus_mask.bedgraph \
-        -V rpm
-    
-    awk -F'[\t]' '{if ($5 >= .5){ print }}' $sample_dir/$sample_name.rpm.features.bed > $sample_dir/$sample_name."$A".end_features.bed
-    
-    rm $sample_dir/end_features_temp.bed \
-        $sample_dir/end_features."$A".bed \
-        $sample_dir/$sample_name.rpm.features.bed \
-        $sample_dir/"$library_type"."$A"_plus_features.bed \
-        $sample_dir/"$library_type"."$A"_minus_features.bed
-#        $sample_dir/"$library_type"."$A"_plus_subtract.bedgraph \
-#        $sample_dir/"$library_type"."$A"_minus_subtract.bedgraph
+        -K $KERNEL \
+        -H $BANDWIDTH \
+        -S 3 \
+        -D 3 \
+        -P \
+        -c $CPUS"
+    echo $kernel_density_command
+    eval $kernel_density_command
+    if [ ! -f $sample_dir/"$library_type"."$strand"_smooth.bedgraph ]
+    then
+        echo "ERROR: Failed to generate "$library_type"."$strand"_smooth.bedgraph"
+        exit 1
+    fi
+    feature_threshold_command="python \
+    $python_dir/bedgraph_thresh_to_bed.py \
+    -B $sample_dir/"$library_type"."$strand"_smooth.bedgraph \
+    -O $sample_dir/"$library_type"."$strand"_features.bed \
+    -L $resource_dir/length.table \
+    -T 0 \
+    -M 10 \
+    -V sum \
+    -S $strand"
+    echo $feature_threshold_command
+    eval $feature_threshold_command
+    if [ ! -f $sample_dir/"$library_type"."$strand"_features.bed ]
+    then
+        echo "ERROR: Failed to generate "$library_type"."$strand"_features.bed"
+        exit 1
+    fi
 done
 
-echo "Phase 3.4 complete."
+# Merges all end features identified in PHASE 3.4 to a single BED file.
+rm -f $sample_dir/end_features_temp.bed
+touch $sample_dir/end_features_temp.bed
+sed 's/thresh./'$library_type'.plus./' $sample_dir/"$library_type".plus_features.bed \
+    >> $sample_dir/end_features_temp.bed
+sed 's/thresh./'$library_type'.minus./' $sample_dir/"$library_type".minus_features.bed \
+    >> $sample_dir/end_features_temp.bed
 
+bedtools sort -i $sample_dir/end_features_temp.bed > $sample_dir/end_features.bed
+
+python $python_dir/bed_find_peaks.py \
+    -I $sample_dir/end_features.bed \
+    -L $resource_dir/length.table \
+    -O $sample_dir/$SAMPLE_NAME.rpm.features.bed \
+    -BP $sample_dir/"$library_type".plus_mask.bedgraph \
+    -BM $sample_dir/"$library_type".minus_mask.bedgraph \
+    -V rpm
+
+awk -F'[\t]' -v rpm="$RPM" '{if ($5 >= rpm){ print }}' $sample_dir/$SAMPLE_NAME.rpm.features.bed > $sample_dir/$SAMPLE_NAME.end_features.bed
+
+rm $sample_dir/end_features_temp.bed \
+    $sample_dir/end_features.bed \
+    $sample_dir/$SAMPLE_NAME.rpm.features.bed \
+    $sample_dir/"$library_type".plus_features.bed \
+    $sample_dir/"$library_type".minus_features.bed
+    $sample_dir/"$library_type"."$A"_plus_subtract.bedgraph \
+    $sample_dir/"$library_type"."$A"_minus_subtract.bedgraph
+
+echo "Step 3 complete."
 echo "EndGraph complete!"
 
