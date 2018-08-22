@@ -9,8 +9,9 @@ Usage: ./nanoPARE_setup.sh [options]
 Sets up a collection of files required to run the nanoPARE tools:
  1) Writes a length.table recording the length of each chromosome in the genome FASTA
  2) Generates a STAR genome index using the reference genome and transcriptome
- 3) Writes a BED file of putative TSO strand invasion sites based on mask_sequences.table
- 4) Writes a labeled version of the reference genome based on what annotations feature(s) exist
+ 3) Writes a BED file of putative TSO strand invasion sites based on mask_sequences.table  
+ 4) Writes a transcriptome FASTA file by combinding -G and -A  
+ 5) Parses reference annotations to identify 5'-terminal exons and single-exon transcripts  
 
 The genome index is written to temp/genome_index.
 Other setup files are added to the resources/ directory.

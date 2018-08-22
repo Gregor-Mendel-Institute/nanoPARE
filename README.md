@@ -16,7 +16,7 @@ These tools were written for Linux systems and optimized for a high-performance 
   
 Software requirements:  
   *STAR aligner 2.5+  
-  *Python 3.5+  
+  *Python 3.6+  
   *Samtools 1.3+  
   *Bedtools 2.26  
   *Cutadapt 1.9  
@@ -30,11 +30,20 @@ This will install the shell scripts described above, all default configuration f
   
   
 ### Setup (nanoPARE_setup.sh)  
-INPUTS:  
-  **-G|--genome** [file] (genome sequence in FASTA format)  
-  **-A|--annotation** [file] (gene annotation file in GTF/GFF3 format)  
+**Usage: ./nanoPARE_setup.sh [options]**  
+Options:  
+  -G|--genome      Reference genome file in FASTA format
+  -A|--annotation  Reference annotation file in GTF/GFF format
+  -R|--reference   Reference table for input samples (see below)
+
+Sets up a collection of files required to run the nanoPARE tools:  
+  1) Writes a length.table recording the length of each chromosome in the genome FASTA  
+  2) Generates a STAR genome index using the reference genome and transcriptome  
+  3) Writes a BED file of putative TSO strand invasion sites based on mask_sequences.table  
+  4) Writes a transcriptome FASTA file by combinding -G and -A  
+  5) Parses reference annotations to identify 5'-terminal exons and single-exon transcripts  
   
-This script must be run before performing any of the analysis steps for the first time. During setup, a few reference files are generated for the pipeline to recognize certain features in the reference genome (a multi-FASTA file), and reference transcriptome (a GTF or GFF3 formatted file that is indexed against the reference genome). *nanoPARE_setup.sh* uses these files to (1) find sites of potential strand invasion artifacts and (2) parse out a collection of 5'-most exons from the transcript annotations for comparison. If no files are provided, the setup will use *resources/genome.fasta* and *resources/annotation.gff*, which are part of the test dataset.  
+This script must be run before performing any of the analysis steps for the first time. During setup, a few reference files are generated for the pipeline to recognize certain features in the reference genome (a multi-FASTA file), and reference transcriptome (a GTF or GFF3 formatted file that is indexed against the reference genome). *nanoPARE_setup.sh* uses these files to (1) find sites of potential strand invasion artifacts and (2) parse out a collection of 5'-most exons from the transcript annotations for comparison. If no files are provided, the setup will use **resources/genome.fasta** and **resources/annotation.gff**, which are part of the test dataset.  
   
 To complete setup, you will also need to write an 8-column reference table that gives the pipeline all relevant information about the sequencing files you want to process. You can use the reference table in /resources/reference.table as a guide:  
   
@@ -50,48 +59,77 @@ To complete setup, you will also need to write an 8-column reference table that 
 All 5 tools will use this reference file as a lookup table. You can either modify the table in this repository (nanoPARE/resources/reference.table) or provide a filepath to your own table using the argument **-R|--reference** for any of the tools listed below. Each step was written so that samples can be processed in parallel, but downstream steps of the pipeline all use files generated in previous steps, so you will need to run each of them in order.  
   
 ### 1: EndMap (endMap.sh)  
-INPUTS:  
-  **-L|--line** [number] Line number in the reference table of the sample you want to process  
-OPTIONAL:  
-  **-R|--reference** [file] A reference table as formatted above  
-  **-I|--icomp** [float] minimum per-nucleotide i-complexity (default=0.15)
+**Usage: ./endMap.sh [options] -L|--line <line_number>**  
   
-EndMap first trims the appropriate adapter sequences using *cutadapt*. By default these sequences are based on the Tn5 adapter sequences of the Nextera Tagmentation kit. To prevent reads with low sequence complexity from mapping to the genome, the I-complexity (Becher and Heiber 2012) of each FASTQ read is calculated by the Python script *fastq_complexity_filter.py*, and reads with a per-nucleotide I-complexity <0.15 are removed prior to mapping. The remaining reads are then aligned to the genome with *STAR*. The alignment settings are optimized for Arabopsis by default, you can change these settings in the file **resources/OPTIONS_star_global**. In addition to these global settings, mapping behavior differs slightly when BODY and 5P libraries. BODY reads are mapped using --alignEndsType EndToEnd, and softclipping is allowed at the ends of 5P reads using --alignEndsType Local and --outFilterMatchNminOverLread 0.9.  
-After alignment, 5′ end read depth for each position in the genome is calculated from the BAM file using the Python script *readmapIO.py*. Each BAM file contains reads that mapped from 1-100 times to the reference genome. For reads that mapped to more than one location, the most likely locus of origin is inferred via a “rich-get-richer” algorithm similar to that employed by the software [MuMRescue](https://academic.oup.com/bioinformatics/article/25/19/2613/180391). ReadmapIO begins by calculating the coverage depth of uniquely mapping reads at each position in the genome. Multimappers are then binned by their mapping multiplicity (i.e. a read that maps to 10 locations in the genome has a multiplicity of 10). Beginning with a multiplicity of 2, all reads in that bin are sorted from lowest possible genomic position to highest, and each read is assigned in a multistep process: if at least one mapping position has at least one existing read, the read is considered “unambiguous”, and is assigned proportionally to its mapping locations using the formula <img alt="P_{i}=\frac{C_{i}}{\sum_{j=1}^{n} C_{j}}" src="/resources/images/readmapIO_eq1.gif">,  where *Pi* is the proportion of reads assigned to mapping location *i*, *Ci* is the total existing read coverage assigned to the genomic positions that comprise location *i*, and *n* is the number of mapping locations for the read. If the existing read coverage at all locations is 0, that read is not yet assigned. After examining all reads in the bin, the bin is sorted from highest genomic position to lowest and the process is repeated, until no more unambiguous reads can be identified. At this point, all remaining reads in the bin are assigned with equal weighting, or *Pi=1/n*. Bins are assigned this way in order from a multiplicity of 2 to 100. After all reads are assigned, readmapIO outputs a bedgraph file of assigned read 5′ end counts for the plus and minus strand of the genome. If the library type is 5P, readmapIO also outputs bedgraph files of all nucleotides softclipped from the 5′ end of reads. These will be referred to hereafter as upstream untemplated nucleotides (uuNs).
-
+Aligns RNA-seq reads from 5P and/or BODY experiments to a reference genome.  
+  1) Trims adapter sequences with cutadapt  
+  2) Performs gapped alignment with STAR  
+  3) Converts mapped reads to coverage values with readmapIO  
+  
+Outputs a BEDGRAPH of mapped read 5' ends for both strands of the genome.  
+  
+Optional arguments:
+  --lmod   Load required modules with Lmod (default: false)
+  --bias   Perform nucleotide bias correction (default: false)
+  --ram    Amount of available RAM in gigabytes (default: 30)
+  --cpus   Number of cores available for multithreaded programs (default: 1)
+  --icomp  Minimum i-complexity score to filter reads before mapping (default: 0)
   
 ### 2: EndGraph (endGraph.sh)  
-INPUTS:  
-  **-N|--name** [string] sample name with both a 5P and BODY library to process from the reference table  
-OPTIONAL:  
-  **-R|--reference** A reference table as formatted above  
+**Usage: ./endGraph.sh [options] -N|--name <sample_name>**  
   
-Discrete 5P features are identified genome-wide via subtractive kernel density estimation. Bedgraph files output from EndMap corresponding to a sample’s 5P and BODY libraries were evaluated together. First, strand invasion artifacts are masked based on the masking file that was generated during *nanoPARE_setup.sh*. Then, a scaling factor (S) is estimated to normalize the read depth of the 5P library against the BODY library using the formula:
-<img alt="S=\frac{2F*10^{6}}{\sum_{i=1}^{n}TPM_i*L_i))}*\frac{R_B}{R_E}" src="/resources/images/endgraph_eq1.gif">,
-where *n* is the total number of transcripts, *TPMi* is the abundance of a transcript in transcripts per million, *Li* is the length of a transcript in nucleotides, *F* is the mean fragment length of the BODY library, *RB* is the total number of mapped BODY reads, and *RE* is the total number of mapped 5P reads. Then, a Laplace kernel with a bandwidth of 15 nucleotides is fit over the set of values *(ER * S) – BR*, where *ER* is the set of 5P end read counts and *BR* is the set of body read counts. Regions of continuous positive density were extracted and written as discrete features to a bed file. The formula above attempts to normalize the two libraries by estimating the expected ratio of cDNA fragments  that contain 5’ ends based on the assumption that all signal is derived from full-length transcripts (as defined by the reference transcript annotations). By making this assumption, spurious 5P signal downstream of the true 5’ terminus should be weaker than it needs to be to outweigh the BODY signal in that location.  
+Identification of end features through subtractive kernel density estimation  
+  1) Determines a scaling factor to adjust read depths of 5P and BODY libraries  
+  2) Smooths signal by fitting a Laplace kernel to END - BODY read values  
+  3) Converts continuous regions of positive signal to features in a BED file  
+  
+Expects EndMap to be run and the results for sample_name in the directory /results/EndMap/sample_name  
+  
+Optional arguments:  
+  --lmod       Load required modules with Lmod (default: false)  
+  --cpus       Number of cores available for multithreaded programs (default: 1)  
+  --rpm        Minimum RPM required to keep a feature (default: 5 for test data). Recommend 0.5 RPM for real libraries.  
+  --kernel     Type of kernel to use for density estimation (default: laplace. options: gaussian, laplace)  
+  --bandwidth  Bandwidth of kernel to use, in nucleotides (default: 15)  
+  --fraglen    Mean fragment length of cDNA library, in nucleotides (default: 200)  
   
 ### 3: EndClass (endClass.sh)  
-INPUTS:  
-  **-T|--type** [string] sample type with at least two samples included in the reference table  
-OPTIONAL:  
-  **-R|--reference** [file] A reference table as formatted above  
-  **--min_uug** [float] Minimum percent upstream untemplated G to classify a feature as "capped" (default=0.1)
+**Usage: ./endClass.sh [options] -T|--type <sample_type>**  
   
-If a 5P experiment was designed with multiple replicates, EndClass merged all 5P features that could be reproducibly identified in ≥2 replicates. Then, the presence of a m7G cap was predicted for each replicable feature by calculating the proportion of reads containing upstream untemplated guanosine (uuG). A feature was considered capped if ≥10% of all reads from a sample type that map within the feature contained uuG, otherwise the feature was considered noncapped.  
+Labeling and classification of 5'-end features as capped or noncapped  
+  1) Labels all 5P features based on their relationship to the nearest transcriptome annotation  
+  2) Filters 5P features for only those replicable in >=2 experiments  
+  3) Counts the proportion of reads in each 5P feature with upstream untemplated G (uuG)  
+  4) Splits 5P features into "capped" (>=10% uuG) and "noncapped" (<10% uuG)  
+  5) Calculates the number of full-length and truncated reads mapping to each gene  
+  
+Expects EndMap and EndGraph to be run before and their results to be in directories  
+*/results/EndMap/sample_name* and */results/EndGraph/sample_name* respectively,  
+for all samples of the chosen sample type that appear in reference.table  
+  
+Optional arguments:  
+  --lmod      Load required modules with Lmod (default: false)  
+  --cpus      Number of cores available for multithreaded programs (default: 1)  
+  --uug       Minimum proportion uuG required to classify a feature as capped (default: 0.1)  
+  --upstream  Maximum distance upstream (in nucleotides) to associate a 5P feature (default: 500)  
   
 ### 4: EndMask (endMask.sh)  
-INPUTS:  
-  **-T|--type** [string] sample type with at least two samples included in the reference table  
-OPTIONAL:  
-  **-R|--reference** A reference table as formatted above  
+**Usage: ./endMask.sh [options] -T|--type <sample_type>**  
   
-EndMask prepared a bedgraph file of 5P read positions relative to the start site of the dominant isoform of each gene in the reference annotation. Dominant isoforms were defined as the transcript isoform containing the most mapped reads. For nanoPARE libraries, this transcript-level bedgraph was generated with a cap-masked input in which 5P reads contained within replicable capped 5P features were discarded.
+Masks reads belonging to capped features in the genome and prepares transcript bedgraph files for EndCut.  
+  1) Identifies the transcript isoform with the most reads from each gene  
+  2) Sets values for all 5P reads within a capped feature to 0  
+  3) Writes a transcript-indexed bedgraph file of cap-masked reads with all dominant transcripts  
   
-### 5: EndCut (endCut.sh)  
-INPUTS:  
-  **-N|--name** [string] sample name to process from the reference table  
-OPTIONAL:  
-  **-R|--reference** A reference table as formatted above  
+Expects EndMap, EndGraph, and EndClass to be run before and their results to be in directories  
+*/results/EndMap/sample_name*, */results/EndGraph/sample_name*, and */results/EndClass/sample_type*  
+respectively, for all samples of the chosen sample_type that appear in reference.table  
   
+Optional arguments:  
+  --lmod  Load required modules with Lmod (default: false)  
+  --cpus  Number of cores available for multithreaded programs (default: 1)  
+  --mask  Alternative sample_type to use for cap masking (default: sample_type)  
+  
+### 5: EndCut  
 Sequences from miRNAs and tasiRNAs annotated in TAIR10 or miRBase21 (Lamesch et al. 2012; Kozomara and Griffiths-Jones 2013) were selected (i.e. anno.mir.tas.fa) and randomized one thousand times each by the python script sRNA_shuffler.py to produce anno.mir.tas.i.fa files; where i is an integer between 0 and 999). For annotated miRNA, tasiRNA and the corresponding 1,000 randomized variants for each miRNA/tasiRNA, GSTAr.pl (https://github.com/MikeAxtell/GSTAr) was used to predict target sites in transcript models annotated as protein-coding genes, transposable element genes or other RNAs (i.e. TAIR10_pc_teg_other_transcripts.fasta). Target sites were determined based on the level of complementarity between sRNAs and transcripts computed using previously developed criteria based on the frequency and position of the miRNA-target duplex mismatches (i.e. Allen scores) (Allen et al. 2005) As described above, nanoPARE data was processed by EndMask to exclude capped regions of transcripts from further analyses. Publicly available PARE datasets were downloaded from the Sequence Read Archive (NCBI) (Supplementary Data S1), but alignments overlapping capped features were not excluded from downstream analyses. 
 Predicted target sites and EndGraph output were used by EndCut_step1.sh to quantify the number of reads at predicted target sites and in adjacent 20 nt or 50 nt regions on the sense strand of the same transcript. Adjacent sites within one nucleotide of predicted cleavage sites were not considered in order to not penalize sites for sRNA isoforms with slightly offset target recognition sites. The local enrichment of nanoPARE read 5′ ends at predicted cleavage sites relative to surrounding transcribed regions, or fold-changes, were calculated by dividing the numbers of nanoPARE read 5′ ends at predicted cleavage sites + 1 by the maximum numbers of reads in adjacent transcript regions + 1. Allen scores were also assigned to each predicted cleavage site detected. For each randomized sRNA control set, EndCut_step2.R computed empirical cumulative distribution functions of fold-changes (ECDFFC) and Allen scores (ECDFAS). These were then used as null models to test whether the observed cleavage site fold-changes were not equal to or lesser than ECDFFC, as well as if the observed site Allen scores were not equal to or greater than ECDFAS. Final P-values were computed for each site by combining these two P-values using Fisher’s combined probability test, and then adjusted for multiple testing using the Benjamini- and Hochberg method. For our analyses, we selected predicted cleavage sites with adjusted P-values < 0.05, fold-changes > 1.0 and that were also represented by at least one read per ten million transcriptome-mapping reads. 
