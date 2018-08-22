@@ -122,6 +122,12 @@ python $python_dir/fasta_sequence_search.py \
 echo "Masking BED files generated."
 echo " "
 
+echo "Generating transcriptome FASTA file."
+python $python_dir/gtf_to_fastq.py \
+    -G $GENOME_FASTA \
+    -A $ANNOTATION_GFF \
+    > $resource_dir/transcriptome.fasta
+
 echo "### GENERATE ANNOTATION CLASS REFERENCE FILES ###"
 
 cd $resource_dir
