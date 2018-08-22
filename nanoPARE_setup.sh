@@ -123,7 +123,7 @@ echo "Masking BED files generated."
 echo " "
 
 echo "Generating transcriptome FASTA file."
-python $python_dir/gtf_to_fastq.py \
+python $python_dir/gtf_to_fasta.py \
     -G $GENOME_FASTA \
     -A $ANNOTATION_GFF \
     > $resource_dir/transcriptome.fasta
