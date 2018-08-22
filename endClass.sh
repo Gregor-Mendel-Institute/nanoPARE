@@ -25,6 +25,7 @@ Optional arguments:
 --lmod               Load required modules with Lmod (default: false)
 --cpus               Number of cores available for multithreaded programs (default: 1)
 --uug                Minimum proportion uuG required to classify a feature as capped (default: 0.1)
+--upstream           Maximum distance upstream (in nucleotides) to associate a 5P feature (default: 500)
 
 All steps of this pipeline access the default files for -R, -G, and -A, respectively.
 You can replace these 3 items in the resources folder for simplicity.
@@ -92,6 +93,14 @@ fi
 if [ -z "$CPUS" ]
 then
     CPUS=1
+fi
+if [ -z "$UUG" ]
+then
+    UUG=0.1
+fi
+if [ -z "$UPSTREAM" ]
+then
+    UPSTREAM=500
 fi
 
 echo "Config settings:"
@@ -181,23 +190,19 @@ python $python_dir/bedgraph_combine.py \
 echo "Merged coverage files generated."
 
 # Merge all touching/overlapping features from all reps
-bedtools merge \
-    -s \
-    -nms \
-    -n \
-    -d 0 \
-    -i $SAMPLE_TYPE.all.bed \
-    > $SAMPLE_TYPE.merged.bed
-
 # Keep only replicable features (present in more than one library)
-grep -v -P '\t1\t' $SAMPLE_TYPE.merged.bed \
-    > $SAMPLE_TYPE.rep.bed
+bedtools sort -i $SAMPLE_TYPE.all.bed |\
+    bedtools merge -s -c 5 -o count -d 0 |\
+    grep -v -P '\t1$' |\
+    awk -v nm="$SAMPLE_TYPE" '{ printf $1"\t"$2"\t"$3"\t"nm"."NR"\t"$5"\t"$4"\n" }' > $SAMPLE_TYPE.rep.bed
 
-rm $SAMPLE_TYPE.all.bed $SAMPLE_TYPE.merged.bed
+rm $SAMPLE_TYPE.all.bed
 
 bedfile=$SAMPLE_TYPE.rep.bed
 
 # Adding a merged peak position to each replicable feature, keeping both the closest gene ID and distance
+echo " "
+echo "Finding feature peak positions."
 python $python_dir/bed_find_peaks.py \
     -I $bedfile \
     -O $SAMPLE_TYPE.peaks.bed \
@@ -213,6 +218,8 @@ awk '{ printf $1"\t"$2+$5"\t"$2+$5+1"\t"$4"\t"$5"\t"$6"\t"$2"\t"$3"\t"$5"\n" }'\
 bedfile=$SAMPLE_TYPE.only_peaks.bed
 
 # 2: Find the nearest overlapping/downstream exon element in the single-exon transcripts
+echo "Locating nearest annotation to each feature:"
+echo "  overlapping single-exon transcripts"
 bedtools closest -s -id -D b -t first \
     -a $bedfile \
     -b $resource_dir/class.single_exon_genes.bed > $SAMPLE_TYPE.single.tmp.bed
@@ -220,56 +227,62 @@ grep -P '\t0$' $SAMPLE_TYPE.single.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"
 rm $SAMPLE_TYPE.single.tmp.bed
 
 # 3: Find the nearest overlapping/downstream exon element of 5'-terminal exons
+echo "  overlapping 5'-terminal exons"
 bedtools closest -s -id -D b -t first \
     -a $bedfile \
     -b $resource_dir/class.terminal_exons_by_gene.bed > $SAMPLE_TYPE.terminal.tmp.bed
 grep -P '\t0$' $SAMPLE_TYPE.terminal.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$14"\t6\n" }' > $SAMPLE_TYPE.terminal_exon_overlap.bed
-grep -v -P '\t0$' $SAMPLE_TYPE.terminal.tmp.bed | awk '{ if ( $19 >= -500 ) printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$14"\t4\n" }' > $SAMPLE_TYPE.upstream.bed
+grep -v -P '\t0$' $SAMPLE_TYPE.terminal.tmp.bed | awk -v up="$UPSTREAM" '{ if ( $16 >= -up ) printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t4\n" }' > $SAMPLE_TYPE.upstream.bed
 rm $SAMPLE_TYPE.terminal.tmp.bed
 
 # 3: Find the nearest overlapping/downstream exon element of all transcripts
+echo "  Between exons"
 bedtools closest -s -id -D b -t first \
     -a $bedfile \
     -b $resource_dir/class.exons_by_gene.bed > $SAMPLE_TYPE.nearest_downstream.tmp.bed
-grep -P '\t0$' $SAMPLE_TYPE.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$14"\t5\n" }' > $SAMPLE_TYPE.exon_overlap.bed
+grep -P '\t0$' $SAMPLE_TYPE.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t5\n" }' > $SAMPLE_TYPE.exon_overlap.bed
 bedtools intersect -v -wa -a $SAMPLE_TYPE.exon_overlap.bed -b $SAMPLE_TYPE.terminal_exon_overlap.bed > $SAMPLE_TYPE.internal_exon_overlap.bed
-grep -v -P '\t0$' $SAMPLE_TYPE.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$14"\t0\n" }' > $SAMPLE_TYPE.is_upstream_of.bed
-bedtools intersect -v -wa -a $SAMPLE_TYPE.is_upstream_of.bed -b $SAMPLE_TYPE.upstream.bed > $SAMPLE_TYPE.nearest_downstream.bed
+grep -v -P '\t0$' $SAMPLE_TYPE.nearest_downstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t0\n" }' > $SAMPLE_TYPE.is_upstream_of.bed
+bedtools intersect -v -wa -a $SAMPLE_TYPE.is_upstream_of.bed -b $SAMPLE_TYPE.upstream.bed | bedtools sort > $SAMPLE_TYPE.nearest_downstream.bed
 rm $SAMPLE_TYPE.nearest_downstream.tmp.bed $SAMPLE_TYPE.exon_overlap.bed
 
 # 4: Find the nearest overlapping/upstream exon element of all transcripts
+echo "  Upstream of annotations"
 bedtools closest -s -iu -D b -t first \
     -a $bedfile \
     -b $resource_dir/class.exons_by_gene.bed > $SAMPLE_TYPE.nearest_upstream.tmp.bed
-grep -v -P '\t0$' $SAMPLE_TYPE.nearest_upstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$14"\t0\n" }' > $SAMPLE_TYPE.is_downstream_of.bed
-bedtools intersect -v -wa -a $SAMPLE_TYPE.is_downstream_of.bed -b $SAMPLE_TYPE.upstream.bed > $SAMPLE_TYPE.nearest_upstream.bed
+grep -v -P '\t0$' $SAMPLE_TYPE.nearest_upstream.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t0\n" }' > $SAMPLE_TYPE.is_downstream_of.bed
+bedtools intersect -v -wa -a $SAMPLE_TYPE.is_downstream_of.bed -b $SAMPLE_TYPE.upstream.bed | bedtools sort > $SAMPLE_TYPE.nearest_upstream.bed
 rm $SAMPLE_TYPE.nearest_upstream.tmp.bed $SAMPLE_TYPE.is_downstream_of.bed
 
 # 5: Isolate features whose peaks are both upstream and downstream of exons of the same gene
+echo "  Contained within introns"
 bedtools closest -a $SAMPLE_TYPE.nearest_upstream.bed -b $SAMPLE_TYPE.nearest_downstream.bed \
-    | awk '{ if ( $14 == 0 && $7 == $13 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$13"\t3\n" }' \
+    | awk '{ if ( $18 == 0 && $7 == $16 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$17"\t3\n" }' \
     > $SAMPLE_TYPE.intronic.bed
 
 cat $SAMPLE_TYPE.terminal_exon_overlap.bed $SAMPLE_TYPE.upstream.bed $SAMPLE_TYPE.internal_exon_overlap.bed $SAMPLE_TYPE.intronic.bed \
     | bedtools sort > $SAMPLE_TYPE.all_sense.bed
-bedtools intersect -v -s -wa -a $bedfile -b $SAMPLE_TYPE.all_sense.bed > $SAMPLE_TYPE.residuals.bed
+bedtools intersect -v -s -wa -a $bedfile -b $SAMPLE_TYPE.all_sense.bed | bedtools sort > $SAMPLE_TYPE.residuals.bed
 
 # 6: Find the nearest overlapping/upstream exon element in antisense for all features that had no sense match above
+echo "  Antisense to existing annotations"
 bedtools closest -S -id -D b -t first \
     -a $SAMPLE_TYPE.residuals.bed \
     -b $resource_dir/class.exons_by_gene.bed > $SAMPLE_TYPE.antisense_a.tmp.bed
-grep -P '\t0$' $SAMPLE_TYPE.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$14"\t"$15"\t2\n" }' > $SAMPLE_TYPE.antisense.bed
-grep -v -P '\t0$' $SAMPLE_TYPE.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$14"\t"$15"\t0\n" }' > $SAMPLE_TYPE.anti_upstream_of.bed
+grep -P '\t0$' $SAMPLE_TYPE.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t2\n" }' | bedtools sort > $SAMPLE_TYPE.antisense.bed
+grep -v -P '\t0$' $SAMPLE_TYPE.antisense_a.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t0\n" }' | bedtools sort > $SAMPLE_TYPE.anti_upstream_of.bed
 
 # 7: Find the nearest overlapping/downstream exon element in antisense for all features that had no sense match above
 bedtools closest -S -iu -D b -t first \
     -a $SAMPLE_TYPE.residuals.bed \
     -b $resource_dir/class.exons_by_gene.bed > $SAMPLE_TYPE.antisense_d.tmp.bed
-grep -v -P '\t0$' $SAMPLE_TYPE.antisense_d.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$14"\t"$15"\t0\n" }' > $SAMPLE_TYPE.anti_downstream_of.bed
+grep -v -P '\t0$' $SAMPLE_TYPE.antisense_d.tmp.bed | awk '{ printf $1"\t"$7"\t"$8"\t"$4"\t"$9"\t"$6"\t"$13"\t"$16"\t0\n" }' | bedtools sort > $SAMPLE_TYPE.anti_downstream_of.bed
 
 # 5: Isolate features whose peaks are both upstream and downstream of antisense exons of the same gene
+echo "  Antisense intronic"
 bedtools closest -a $SAMPLE_TYPE.anti_upstream_of.bed -b $SAMPLE_TYPE.anti_downstream_of.bed \
-    | awk '{ if ( $14 == 0 && $7 == $13 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$13"\t1\n" }' \
+    | awk '{ if ( $18 == 0 && $7 == $16 ) printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t"$7"\t"$17"\t1\n" }' \
     > $SAMPLE_TYPE.anti_intronic.bed
 
 rm $SAMPLE_TYPE.antisense_a.tmp.bed $SAMPLE_TYPE.antisense_d.tmp.bed
@@ -285,7 +298,7 @@ cat $SAMPLE_TYPE.single_exon_overlap.bed \
     $SAMPLE_TYPE.anti_intronic.bed > $SAMPLE_TYPE.gene.bed
 awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6"\t.\t.\t0\n"}' $SAMPLE_TYPE.peaks.bed >> $SAMPLE_TYPE.gene.bed
 # Add a +-1 buffer to each feature to ensure that untemplated upstream nucleotides are included in the range
-bedtools sort -i $SAMPLE_TYPE.gene.bed | awk '{ printf $1"\t"$2-1"\t"$3+1"\t"$4"\t"$5+1"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $SAMPLE_TYPE.gene.sorted.bed
+bedtools sort -i $SAMPLE_TYPE.gene.bed | awk '{ printf $1"\t"$2"\t"$3+1"\t"$4"\t"$5+1"\t"$6"\t"$7"\t"$8"\t"$9"\n"}' > $SAMPLE_TYPE.gene.sorted.bed
 
 python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $SAMPLE_TYPE.gene.sorted.bed | bedtools sort > $SAMPLE_TYPE.all.sorted.bed
 python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $SAMPLE_TYPE.all.sorted.bed \
@@ -301,11 +314,12 @@ python $python_dir/bed_deduplicate.py -F 3 --select highscore --scoreline 8 $SAM
 
 bedtools sort -i $SAMPLE_TYPE.all_features.unsorted.bed | awk '{$4 = "5P."NR; print}' | sed 's/ /\t/g' > $SAMPLE_TYPE.all_features.bed
 
-#    rm -f $SAMPLE_TYPE.single_exon_overlap.bed $SAMPLE_TYPE.gene.bed $SAMPLE_TYPE.gene.sorted.bed $SAMPLE_TYPE.all.sorted.bed $SAMPLE_TYPE.all_features.unsorted.bed \
-#        $SAMPLE_TYPE.upstream.bed $SAMPLE_TYPE.terminal_exon_overlap.bed $SAMPLE_TYPE.is_upstream_of.bed \
-#        $SAMPLE_TYPE.internal_exon_overlap.bed $SAMPLE_TYPE.nearest_downstream.bed $SAMPLE_TYPE.residuals.bed \
-#        $SAMPLE_TYPE.nearest_upstream.bed $SAMPLE_TYPE.intronic.bed $SAMPLE_TYPE.all_sense.bed $SAMPLE_TYPE.antisense.bed \
-#        $SAMPLE_TYPE.anti_upstream_of.bed $SAMPLE_TYPE.anti_intronic.bed $SAMPLE_TYPE.anti_downstream_of.bed
+rm -f $SAMPLE_TYPE.single_exon_overlap.bed $SAMPLE_TYPE.gene.bed $SAMPLE_TYPE.gene.sorted.bed \
+      $SAMPLE_TYPE.all.sorted.bed $SAMPLE_TYPE.all_features.unsorted.bed \
+      $SAMPLE_TYPE.upstream.bed $SAMPLE_TYPE.terminal_exon_overlap.bed $SAMPLE_TYPE.is_upstream_of.bed \
+      $SAMPLE_TYPE.internal_exon_overlap.bed $SAMPLE_TYPE.nearest_downstream.bed $SAMPLE_TYPE.residuals.bed \
+      $SAMPLE_TYPE.nearest_upstream.bed $SAMPLE_TYPE.intronic.bed $SAMPLE_TYPE.all_sense.bed $SAMPLE_TYPE.antisense.bed \
+      $SAMPLE_TYPE.anti_upstream_of.bed $SAMPLE_TYPE.anti_intronic.bed $SAMPLE_TYPE.anti_downstream_of.bed
 
 ########################################################
 
@@ -327,7 +341,11 @@ python $python_dir/bed_uug_filter.py \
 
 bedtools sort -i $SAMPLE_TYPE.capped.bed | awk '{ $4="5P.capped."NR; print }' | sed 's/ /\t/g' > $SAMPLE_TYPE.capped.sorted.bed
 bedtools sort -i $SAMPLE_TYPE.noncapped.bed | awk '{ $4="5P.noncapped."NR; print }' | sed 's/ /\t/g' > $SAMPLE_TYPE.noncapped.sorted.bed
-cat $SAMPLE_TYPE.capped.sorted.bed $SAMPLE_TYPE.noncapped.sorted.bed | bedtools sort > $SAMPLE_TYPE.5P.bed
+cat $SAMPLE_TYPE.capped.sorted.bed $SAMPLE_TYPE.noncapped.sorted.bed | bedtools sort > $SAMPLE_TYPE.5P_features.bed
+
+rm -f $SAMPLE_TYPE.capped.sorted.bed $SAMPLE_TYPE.noncapped.sorted.bed \
+      $SAMPLE_TYPE.all_features.bed $SAMPLE_TYPE.peaks.bed $SAMPLE_TYPE.only_peaks.bed \
+      $SAMPLE_TYPE.rep.bed
 
 echo "Cap masking bedgraph files..."
 
@@ -363,12 +381,11 @@ python $mask \
 # CALCULATE READ COVERAGE #
 ###########################
 
-echo "Making gene-level bed file..."
 # Subset 5' end features for only those that are
 # (1) capped, and
 # (2) within 500nt of an existing gene annotation
 
-bedtools subtract -a $resource_dir/exons_by_gene.bed -b $SAMPLE_TYPE.capped.bed -s > $SAMPLE_TYPE.exons_noncapped.bed
+bedtools subtract -a $resource_dir/class.exons_by_gene.bed -b $SAMPLE_TYPE.capped.bed -s > $SAMPLE_TYPE.exons_noncapped.bed
 grep -P '\t[PIUD]\t' $SAMPLE_TYPE.capped.bed |\
     awk '{ printf $1"\t"$2"\t"$3"\t"$7"\t"$5"\t"$6"\n" }' > $SAMPLE_TYPE.exons_capped.bed
 
@@ -385,3 +402,11 @@ python $python_dir/bed_feature_coverage.py \
     -I ${plus_list[@]} ${minus_list[@]} \
     -N ${plus_names[@]} ${minus_names[@]} \
     -O $SAMPLE_TYPE.noncapped.counts.tsv
+
+rm -f $SAMPLE_TYPE.exons*capped.bed
+for s in ${samples[@]}
+do
+    rm $s.*us.bedgraph
+done
+
+

@@ -32,6 +32,8 @@ while [ "$1" != "" ]; do
                                 ;;
     --uug )                     shift; UUG=$1
                                 ;;
+    --upstream )                shift; UPSTREAM=$1
+                                ;;
     --rpm )                     shift; RPM=$1
                                 ;;
     --fraglen )                 shift; FRAGLEN=$1
@@ -39,6 +41,8 @@ while [ "$1" != "" ]; do
     --bandwidth )               shift; BANDWIDTH=$1
                                 ;;
     --kernel )                  shift; KERNEL=$1
+                                ;;
+    --mask )                    shift; MASK_NAME=$1
                                 ;;
     * )                         echo "Argument not recognized."; usage; exit 1
                                 ;;

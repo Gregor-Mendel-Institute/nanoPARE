@@ -19,10 +19,10 @@ Optional arguments:
 -A | --annotation    Transcript GFF file (default: resources/annotation.gff)
 --lmod               Load required modules with Lmod (default: false)
 --cpus               Number of cores available for multithreaded programs (default: 1)
+--rpm                Minimum RPM required to keep a feature (default: 0.5)
 --kernel             Type of kernel to use for density estimation (default: laplace. options: gaussian, laplace)
 --bandwidth          Bandwidth of kernel to use, in nucleotides (default: 15)
 --fraglen            Mean fragment length of cDNA library, in nucleotides (default: 200)
---rpm                Minimum RPM required to keep a feature (default: 0.5)
 
 All steps of this pipeline access the default files for -R, -G, and -A, respectively.
 You can replace these 3 items in the resources folder for simplicity.
@@ -203,27 +203,34 @@ fi
 # Write quantification tables for scaling factor estimation
 python $python_dir/gtf_quantify.py \
     -A $ANNOTATION_GFF \
-    -P $sample_dir/"$library_type".plus_mask.bedgraph
-    -M $sample_dir/"$library_type".minus_mask.bedgraph
+    -P $sample_dir/"$library_type".plus_mask.bedgraph \
+    -M $sample_dir/"$library_type".minus_mask.bedgraph \
     --norm reads length RPM TPM \
     --buffer 100 \
     --gene > $sample_dir/"$SAMPLE_NAME"."$library_type".quant.tsv
 
 python $python_dir/gtf_quantify.py \
     -A $ANNOTATION_GFF \
-    -P $bg_plus
-    -M $bg_minus
+    -P $bg_plus \
+    -M $bg_minus \
     --norm reads length RPM TPM \
     --buffer 100 \
     --gene > $sample_dir/"$SAMPLE_NAME".bg.quant.tsv
 
 # Perform scaling based on quantification tables above
 python $python_dir/endgraph_ratio.py \
-    $sample_dir/"$SAMPLE_NAME"."$library_type".quant.tsv
-    $sample_dir/"$SAMPLE_NAME".bg.quant.tsv
+    $sample_dir/"$SAMPLE_NAME"."$library_type".quant.tsv \
+    $sample_dir/"$SAMPLE_NAME".bg.quant.tsv \
     -F $FRAGLEN > $sample_dir/scaling_factor.txt
 
+readnum_5P=$(cat $sample_dir/"$SAMPLE_NAME".5P.quant.tsv | awk '{ sum += $2 } END { print sum }')
+readnum_bg=$(cat $sample_dir/"$SAMPLE_NAME".bg.quant.tsv | awk '{ sum += $2 } END { print sum }')
+
 scale=$(cat $sample_dir/scaling_factor.txt)
+echo "Gene-mapping 5P reads:   $readnum_5P"
+echo "Gene-mapping BODY reads: $readnum_bg"
+echo "Scaling factor: $scale"
+echo " "
 
 if [ $(echo "$scale > $SCALE_CAP" | bc -l) -eq 1 ]
 then    
@@ -313,15 +320,15 @@ python $python_dir/bed_find_peaks.py \
     -BM $sample_dir/"$library_type".minus_mask.bedgraph \
     -V rpm
 
-awk -F'[\t]' -v rpm="$RPM" '{if ($5 >= rpm){ print }}' $sample_dir/$SAMPLE_NAME.rpm.features.bed > $sample_dir/$SAMPLE_NAME.end_features.bed
+awk -F'[\t]' -v rpm="$RPM" '{if ($7 >= rpm){ print }}' $sample_dir/$SAMPLE_NAME.rpm.features.bed > $sample_dir/$SAMPLE_NAME.end_features.bed
 
 rm $sample_dir/end_features_temp.bed \
     $sample_dir/end_features.bed \
     $sample_dir/$SAMPLE_NAME.rpm.features.bed \
     $sample_dir/"$library_type".plus_features.bed \
-    $sample_dir/"$library_type".minus_features.bed
-    $sample_dir/"$library_type"."$A"_plus_subtract.bedgraph \
-    $sample_dir/"$library_type"."$A"_minus_subtract.bedgraph
+    $sample_dir/"$library_type".minus_features.bed \
+    $sample_dir/"$library_type".plus_subtract.bedgraph \
+    $sample_dir/"$library_type".minus_subtract.bedgraph
 
 echo "Step 3 complete."
 echo "EndGraph complete!"

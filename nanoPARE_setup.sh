@@ -103,7 +103,7 @@ genome_index_command="STAR \
 --runThreadN $CPUS \
 --runMode genomeGenerate \
 --genomeDir $genome_index_dir \
---outFileNamePrefix $log_dir/setup_phase/ \
+--outFileNamePrefix $log_dir/ \
 --genomeFastaFiles $GENOME_FASTA \
 --genomeSAindexNbases $index_base_number \
 --sjdbGTFfile $ANNOTATION_GFF"
@@ -141,25 +141,28 @@ grep -P "exon\t" $ANNOTATION_GFF | sed 's/gene_id=\([^;]*\);.*/\1\t/' | sed 's/P
 
 echo "   Reformatting to GFF files to BED files"
 bedtools sort -i class.exons_by_gene.gff |\
-    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
-    bedtools merge -s -nms |\
+    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t0\t"$7"\n" }' |\
+    bedtools merge -s -c 4 -o distinct -delim ";" |\
+    awk '{ printf $1"\t"$2"\t"$3"\t"$5"\t0\t"$4"\n" }' |\
     sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
-    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-    bedtools sort | sort -k 4 > class.exons_by_gene.bed
+    bedtools sort | sort -k 4 > class.exons_by_gene.geneorder.bed
 
+bedtools sort -i class.exons_by_gene.geneorder.bed > class.exons_by_gene.bed
+
+echo "   Reformatting to GFF files to BED files"
 bedtools sort -i class.terminal_exons_by_gene.gff |\
-    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t"$9"\t"$7"\n" }' |\
-    bedtools merge -s -nms |\
+    awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t0\t"$7"\n" }' |\
+    bedtools merge -s -c 4 -o distinct -delim ";" |\
+    awk '{ printf $1"\t"$2"\t"$3"\t"$5"\t0\t"$4"\n" }' |\
     sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
-    awk '{ printf $1"\t"$2"\t"$3"\t"$4"\t0\t"$5"\n" }' |\
-    bedtools sort | sort -k 4 > class.terminal_exons_by_gene.bed
+    bedtools sort > class.terminal_exons_by_gene.bed
 
-echo "   Getting genes with single-exon transcripts"
 python $python_dir/bed_deduplicate.py \
-    --only_unique class.exons_by_gene.bed -F 3 > class.single_exon_genes.bed
+    --only_unique class.exons_by_gene.geneorder.bed -F 3 |\
+    bedtools sort > class.single_exon_genes.bed
 
 echo "   Cleaning up temporary files"
-rm class.terminal_exons_by_gene.gff class.exons_by_gene.gff
+rm class.terminal_exons_by_gene.gff class.exons_by_gene.gff class.exons_by_gene.geneorder.bed
 rm class.terminal_exons_by_transcript.gff class.exons_by_transcript.gff
 
 echo "Setup complete."

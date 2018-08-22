@@ -52,6 +52,18 @@ endgraph_dir=$results_dir/EndGraph
 endclass_dir=$results_dir/EndClass
 genome_index_dir=$temp_dir/genome_index
 
+############################
+# READING THE COMMAND LINE #
+############################
+# Taking the default environment above, add the commandline
+# arguments (see read_cmdline.sh), and write a config file
+if [ $# -eq 0 ]; then
+    usage
+    exit 1
+else
+    . $bash_dir/read_cmdline.sh
+fi
+
 # Set defaults for variables if they are not already in the environment
 if [ -z "$SAMPLE_TYPE" ]
 then
@@ -66,21 +78,21 @@ if [ -z "$JOB_NUMBER" ]
 then
     JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
 fi
-if [ -z "$genome_fasta" ]
+if [ -z "$GENOME_FASTA" ]
 then
-    genome_fasta=$resource_dir/genome.fasta # If not passed already in environment, set as default value
-fi
-if [ -z "$transcript_fasta" ]
-then
-    transcript_fasta=$resource_dir/transcript.fasta
+    GENOME_FASTA=$resource_dir/genome.fasta # If not passed already in environment, set as default value
 fi
 if [ -z "$REFERENCE_TABLE" ]
 then
     REFERENCE_TABLE=$resource_dir/reference.table
 fi
-if [ -z "$annotation_gff" ]
+if [ -z "$ANNOTATION_GFF" ]
 then
-    annotation_gff=$resource_dir/annotation.gff
+    ANNOTATION_GFF=$resource_dir/annotation.gff
+fi
+if [ -z "$transcript_fasta" ]
+then
+    transcript_fasta=$resource_dir/transcript.fasta
 fi
 if [ -z "$LMOD" ]
 then
@@ -139,10 +151,8 @@ samples=( $(echo "${picked_from_table[@]}" | tr [:blank:] \\n | sort -u) )
 #####################
 
 length_table=$resource_dir/length.table
-tso_mask_file=$resource_dir/transcript_TSO_mask.bed
 mask=$python_dir/bedgraph_mask.py
 coverage=$python_dir/bed_feature_coverage.py
-
 output_folder=$results_dir/EndMask
 data_folder=$output_folder/$SAMPLE_NAME
 
@@ -153,29 +163,19 @@ cd $data_folder
 samples=($sample_list)
 echo "Samples: ${samples[@]}"
 echo "Sample type: $SAMPLE_NAME"
-WEIGHTED="true"
-if [ $WEIGHTED == "true" ]
-then
-    ADJUSTMENT=( "R" )
-else
-    ADJUSTMENT=( "R" "W" )
-fi
-
 
 ###########################
 # CALCULATE READ COVERAGE #
 ###########################
 
-
 capped_features=$endclass_dir/$MASK_NAME/$MASK_NAME.capped.bed
-echo "Determining dominant transcript for $SAMPLE_NAME..."
+echo "Determining dominant transcripts for $MASK_NAME..."
 python $python_dir/bedgraph_genome_to_transcripts.py \
-    --subset $annotation_subset \
     --output $SAMPLE_NAME.all.transcript.bedgraph \
     $endclass_dir/$MASK_NAME/$MASK_NAME.plus.bedgraph \
     $endclass_dir/$MASK_NAME/$MASK_NAME.minus.bedgraph \
-    $annotation_gff \
-    $genome_fasta
+    $ANNOTATION_GFF \
+    $GENOME_FASTA
 
 python $python_dir/bedgraph_dominant_transcripts.py \
     -I $SAMPLE_NAME.all.transcript.bedgraph \
@@ -192,23 +192,13 @@ do
     # Perform cap masking on all 5' end bedgraphs (genome level)
     echo Capmasking: $s
     python $mask \
-        -P $endmap_dir/$s/"$s".plus.bedgraph \
-        -M $endmap_dir/$s/"$s".minus.bedgraph \
+        -P $endmap_dir/$s/"$s".5P.plus.bedgraph \
+        -M $endmap_dir/$s/"$s".5P.minus.bedgraph \
         -PO $data_folder/$s.capmask.plus.bedgraph \
         -MO $data_folder/$s.capmask.minus.bedgraph \
         -I $capped_features \
         -L $length_table
-    
-    # Generate dominant transcript-level unmasked bedgraphs
-    echo Converting to transcripts: $s
-    python $python_dir/bedgraph_genome_to_transcripts.py \
-        --subset $SAMPLE_NAME.dominant_transcript_lengths.tsv \
-        --output $s.transcript.unmasked.bedgraph \
-        $endmap_dir/$s/"$s".plus.bedgraph \
-        $endmap_dir/$s/"$s".minus.bedgraph \
-        $annotation_gff \
-        $genome_fasta
-    
+        
     # Generate dominant transcript-level cap masked bedgraphs
     echo Converting to transcripts: $s
     python $python_dir/bedgraph_genome_to_transcripts.py \
@@ -218,14 +208,6 @@ do
         $data_folder/$s.capmask.minus.bedgraph \
         $annotation_gff \
         $genome_fasta
-    
-    # Additionally mask TSO sequences in transcript-level bedgraphs
-    echo TSO masking: $s
-    python $mask \
-        -P $s.transcript.capmasked.bedgraph \
-        -PO $data_folder/$s.transcript.bedgraph \
-        -U $tso_mask_file \
-        -L $SAMPLE_NAME.dominant_transcript_lengths.tsv
     
     # Remove intermediate files
     rm $s.transcript.capmasked.bedgraph

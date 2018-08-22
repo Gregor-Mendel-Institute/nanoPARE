@@ -21,7 +21,7 @@ Optional arguments:
 --lmod               Load required modules with Lmod (default: false)
 --ram                Amount of available RAM in gigabytes (default: 30)
 --cpus               Number of cores available for multithreaded programs (default: 1)
---icomp              Minimum i-complexity score to filter reads before mapping (default: 0.15)
+--icomp              Minimum i-complexity score to filter reads before mapping (default: 0)
 
 All steps of this pipeline access the default files for -R, -G, and -A, respectively.
 You can replace these 3 items in the resources folder for simplicity.
@@ -99,7 +99,7 @@ then
 fi
 if [ -z "$ICOMP" ]
 then
-    ICOMP=0.15
+    ICOMP=0
 fi
 
 echo "Config settings:"
@@ -312,8 +312,12 @@ then
     echo "Adapter trimming complete."
 
     echo "Filtering out low-complexity reads..."
-    python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq $ICOMP
-#    cat "$sample_name"_cleaned.fastq > "$sample_name"_cleaned.1.fastq
+    if [ $ICOMP -gt 0 ]
+    then
+        python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq $ICOMP
+    else
+        cat "$sample_name"_cleaned.fastq > "$sample_name"_cleaned.1.fastq
+    fi
     rm -f "$sample_name"_cleaned.fastq
 else
     #TODO: Improve adapter trimming behavior for BODY reads
@@ -332,13 +336,12 @@ else
 
     echo "cutadapt -a $TN5_2rc -o "$sample_name"_adaptertrim.1.fastq "$sample_name".1.fastq #rc(Tn5.2)"
     eval "cutadapt -a $TN5_2rc -o "$sample_name"_adaptertrim.1.fastq "$sample_name".1.fastq #rc(Tn5.2)"
-
-    echo "cutadapt -a $TN5_1rc -o "$sample_name"_adaptertrim.2.fastq "$sample_name".2.fastq #rc(Tn5.1)"
-    eval "cutadapt -a $TN5_1rc -o "$sample_name"_adaptertrim.2.fastq "$sample_name".2.fastq #rc(Tn5.1)"
-
     ###########
     if [[ $read_type == "PE"* ]]
     then
+        echo "cutadapt -a $TN5_1rc -o "$sample_name"_adaptertrim.2.fastq "$sample_name".2.fastq #rc(Tn5.1)"
+        eval "cutadapt -a $TN5_1rc -o "$sample_name"_adaptertrim.2.fastq "$sample_name".2.fastq #rc(Tn5.1)"
+
         echo "Cleaning reads with fastq_drop_short_pairs.py"
         # directory,mate1,mate2,out1,out2,minlen=sys.argv[1:7]
         echo "python $python_dir/fastq_drop_short_pairs.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name"_cleaned.1.fastq "$sample_name"_cleaned.2.fastq $minimum_pairlength"
@@ -510,6 +513,10 @@ rm "$sample_name"*coverage.bedgraph
 echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$sample_name
 cp $sample_dir/*.bedgraph $results_dir/EndMap/$sample_name/
-cat $sample_dir/comptable.tsv > $results_dir/EndMap/$sample_name/"$sample_name".comptable.tsv
+
+if [[ $library_type == "5P" ]]
+then
+    cat $sample_dir/comptable.tsv > $results_dir/EndMap/$sample_name/"$sample_name".comptable.tsv
+fi
 
 echo Pipeline complete!

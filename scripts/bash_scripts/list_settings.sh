@@ -26,7 +26,10 @@ EndMap settings:
 
 EndGraph settings:
   SAMPLE_NAME="$SAMPLE_NAME"
+  RPM="$RPM"
   KERNEL="$KERNEL"
+  BANDWIDTH="$BANDWIDTH"
+  FRAGLEN="$FRAGLEN"
 
 EndClass settings:
   SAMPLE_TYPE="$SAMPLE_TYPE"
