@@ -92,7 +92,7 @@ then
 fi
 if [ -z "$transcript_fasta" ]
 then
-    transcript_fasta=$resource_dir/transcript.fasta
+    transcript_fasta=$resource_dir/transcriptome.fasta
 fi
 if [ -z "$LMOD" ]
 then
@@ -111,21 +111,8 @@ then
     output_folder=$results_dir/EndMask
 fi
 
-############################
-# READING THE COMMAND LINE #
-############################
-# Taking the default variables above, modifying them with the commandline 
-# arguments (see read_cmdline.sh), and writing a config file
-
-. $bash_dir/read_cmdline.sh
-
-echo "###############"
-echo "### ENDMASK ###"
-echo "###############"
-echo " "
 echo "Config settings:"
 . $bash_dir/list_settings.sh
-
 
 # Environment modules to load with Lmod (if option --lmod is passed)
 REQUIRED_MODULES=( --bedtools )
@@ -153,16 +140,14 @@ samples=( $(echo "${picked_from_table[@]}" | tr [:blank:] \\n | sort -u) )
 length_table=$resource_dir/length.table
 mask=$python_dir/bedgraph_mask.py
 coverage=$python_dir/bed_feature_coverage.py
-output_folder=$results_dir/EndMask
-data_folder=$output_folder/$SAMPLE_NAME
+data_folder=$output_folder/$SAMPLE_TYPE
 
 rm -rf $data_folder
 mkdir -p $data_folder
 cd $data_folder
 
-samples=($sample_list)
 echo "Samples: ${samples[@]}"
-echo "Sample type: $SAMPLE_NAME"
+echo "Sample type: $SAMPLE_TYPE"
 
 ###########################
 # CALCULATE READ COVERAGE #
@@ -186,7 +171,6 @@ python $python_dir/bedgraph_dominant_transcripts.py \
 rm $SAMPLE_NAME.all.transcript.bedgraph $SAMPLE_NAME.dom.transcript.bedgraph
 
 echo "Making gene-level bed files..."
-bedgraph_list=()
 for s in ${samples[@]}
 do
     # Perform cap masking on all 5' end bedgraphs (genome level)
@@ -206,15 +190,8 @@ do
         --output $s.transcript.capmasked.bedgraph \
         $data_folder/$s.capmask.plus.bedgraph \
         $data_folder/$s.capmask.minus.bedgraph \
-        $annotation_gff \
-        $genome_fasta
+        $ANNOTATION_GFF \
+        $GENOME_FASTA
     
-    # Remove intermediate files
-    rm $s.transcript.capmasked.bedgraph
-    bedgraph_list+=( $s.transcript.bedgraph )
 done
-python $python_dir/bedgraph_combine.py \
-    -i ${bedgraph_list[@]} \
-    -o $SAMPLE_NAME.transcript.bedgraph
-
-
+echo "EndMask complete! See results in results/EndMask/$SAMPLE_TYPE"
