@@ -25,6 +25,22 @@ TILE_COVARIANCE_THRESHOLD = 0.15 # tiles with kmers more correlated than this wi
 NEIGHBOR_MARGIN = 10
 COMPL = string.maketrans("ACGT", "TGCA")
 
+parser = argparse.ArgumentParser(description = "Correct allele frequency bias")
+parser.add_argument("bam", help="BAM compressed .npy file")
+parser.add_argument("ref", help="Fasta file")
+parser.add_argument("chroms", help="Chromosome file")
+parser.add_argument("baseline", help="Baseline allele frequencies (CSV)")
+parser.add_argument("bias", help="Read allele frequency bias (CSV)")
+parser.add_argument("out", help="Output (CSV) allele frequencies")
+parser.add_argument("adjusted", help="Output read weights (per-read adjustment, binary)")
+parser.add_argument("covmatrix", help="Tile covariance matrix (NPY)")
+parser.add_argument("--max", help="Maximum reads to process", type=int)
+parser.add_argument("--max_at_pos", help="Maximum reads at a given position", type=int, default=None)
+parser.add_argument("--read_len", help="Read length, default is 20bp", type=int)
+parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
+args = parser.parse_args()
+
+
 def read_baseline(f):
   data = [line.strip().split(',') for line in open(f, 'r').read().strip().split('\n')]
   baseline = {}
@@ -290,19 +306,4 @@ def main(bam_npy_file, fasta_file, chrom_file, baseline_file, bias_file, output_
   numpy.save(adjusted_file, read_weights)
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description = "Correct allele frequency bias")
-  parser.add_argument("bam", help="BAM compressed .npy file")
-  parser.add_argument("ref", help="Fasta file")
-  parser.add_argument("chroms", help="Chromosome file")
-  parser.add_argument("baseline", help="Baseline allele frequencies (CSV)")
-  parser.add_argument("bias", help="Read allele frequency bias (CSV)")
-  parser.add_argument("out", help="Output (CSV) allele frequencies")
-  parser.add_argument("adjusted", help="Output read weights (per-read adjustment, binary)")
-  parser.add_argument("covmatrix", help="Tile covariance matrix (NPY)")
-  parser.add_argument("--max", help="Maximum reads to process", type=int)
-  parser.add_argument("--max_at_pos", help="Maximum reads at a given position", type=int, default=None)
-  parser.add_argument("--read_len", help="Read length, default is 20bp", type=int)
-  parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
-  args = parser.parse_args()
-
   main(args.bam, args.ref, args.chroms, args.baseline, args.bias, args.out, args.adjusted, args.covmatrix, args.max, args.read_len, args.margin)

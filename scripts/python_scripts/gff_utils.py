@@ -15,7 +15,7 @@ from collections import defaultdict
 from operator import itemgetter, attrgetter
 from os.path import basename
 from genomic_features import Transcript
-import pandas as pd
+#import pandas as pd
 
 # TODO: how should the argument strings 'gtf', 'gff3' be handled?
 # TODO: Where shoud Errors be raised?
