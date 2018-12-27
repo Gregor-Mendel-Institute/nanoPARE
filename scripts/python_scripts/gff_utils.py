@@ -74,7 +74,7 @@ def parse_annotation(path, mode='dictionary'):
     """
     if path.lower().endswith('.gtf'):
         return parse_gtf(path, mode)
-    elif path.lower().endswith('.gff'):
+    elif path.lower().endswith('.gff') or path.lower().endswith('.gff3'):
         return parse_gff3(path, mode)
     else:
         raise ValueError('Invalid file type extention! Make sure the file ends'
@@ -311,6 +311,7 @@ def process_lines(lines, patterns):
             if transcript is not None:
                 if is_exon_of(cols, transcript):
                     transcript.add_exon(cols)
+    
     yield transcript
 
 
@@ -326,7 +327,12 @@ def is_exon_of(cols, transcript):
             attributes.
 
     """
-    return transcript.name in cols[ATTR_IDX].values()
+    if transcript.name in cols[ATTR_IDX].values():
+        return True
+    elif 'transcript:'+transcript.name in cols[ATTR_IDX].values():
+        return True
+    
+    return False
 
 def cast_to_integers(cols):
     """Function that casts the start (column 4) and stop (column 5) position of
@@ -357,7 +363,7 @@ def positive_length(cols, line_num):
 
         """
     length = cols[STOP_IDX] - cols[START_IDX]
-    check = length > 0
+    check = length >= 0
     if not check:
         LOGGER.warning('Line: %d contains invalid start and stop positions',
                        line_num)

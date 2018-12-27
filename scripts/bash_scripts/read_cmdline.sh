@@ -12,7 +12,7 @@ while [ "$1" != "" ]; do
                                 ;;
     --lmod )                    LMOD=1
                                 ;;
-    -B |--bias )                BIAS="true"
+    -B |--bias )                BIAS=1
                                 ;;
     --ram )                     shift; RAM=$1
                                 ;;
