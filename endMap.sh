@@ -52,8 +52,13 @@ genome_index_dir=$temp_dir/genome_index
 # Taking the default environment above, add the commandline
 # arguments (see read_cmdline.sh), and write a config file
 if [ $# -eq 0 ]; then
-    usage
-    exit 1
+    if [ -z "${PBS_ARRAY_INDEX}" ]
+    then
+        usage
+        exit 1
+    else
+        JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+    fi
 else
     . $bash_dir/read_cmdline.sh
 fi
@@ -177,8 +182,10 @@ if [[ $input_fastq = *,* ]]
 then
     if [ $read_type == "SE" ]
     then 
-        echo "ERROR: Multiple FASTQ files provided for single-end experiment"
-        exit 1
+        echo "Multiple FASTQ files provided for single-end experiment. Merging..."
+        fastq_split=$(echo $input_fastq | tr ',' ' ')
+        fastq_array=($fastq_split)
+        fastq_file_number=${#fastq_array[@]}
     fi
     echo "Splitting input_fastq into multiple files"
     fastq_split=$(echo $input_fastq | tr ',' ' ')
@@ -207,6 +214,11 @@ do
     else
         echo "Copying fastq file $fastq_file to the sample temp directory"
         cat $fastq_dir/$fastq_file > $sample_dir/"$sample_name"."$mate_number".fastq
+    fi
+    if [[ $read_type == "SE"* ]] && [ $mate_number -gt 1 ]
+    then
+        cat $sample_dir/"$sample_name"."$mate_number".fastq >> $sample_dir/"$sample_name".1.fastq
+        rm $sample_dir/"$sample_name"."$mate_number".fastq
     fi
     ((mate_number+=1))
 done

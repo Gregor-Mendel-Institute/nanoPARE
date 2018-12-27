@@ -58,21 +58,29 @@ genome_index_dir=$temp_dir/genome_index
 # Taking the default environment above, add the commandline
 # arguments (see read_cmdline.sh), and write a config file
 if [ $# -eq 0 ]; then
-    usage
-    exit 1
+    if [ -z $SAMPLE_ARRAY ]
+    then
+        usage
+        exit 1
+    fi
 else
     . $bash_dir/read_cmdline.sh
 fi
 
 # Set defaults for variables if they are not already in the environment
-if [ -z "$SAMPLE_TYPE" ]
-then
-    echo "ERROR: Please input a sample type to process from reference.table (-T|--type)"
-    exit 1
-fi
 if [ -z "$JOB_NUMBER" ]
 then
-    JOB_NUMBER=${PBS_ARRAY_INDEX} # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+    JOB_NUMBER=$(echo "${PBS_ARRAY_INDEX}-1" | bc) # Imports the PBS job array number if it exists. Can be overridden with the commandline argument -J $JOB_NUMBER
+fi
+if [ -z "$SAMPLE_TYPE" ]
+then
+    if [ -z "$SAMPLE_ARRAY" ]
+    then
+        echo "ERROR: Please input a sample type (-T|--type)"
+        exit 1
+    fi
+    SAMPLES=( $(echo $SAMPLE_ARRAY | tr '!' ' ' ) )
+    SAMPLE_TYPE=${SAMPLES[$JOB_NUMBER]}
 fi
 if [ -z "$GENOME_FASTA" ]
 then
