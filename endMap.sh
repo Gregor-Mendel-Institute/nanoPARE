@@ -312,7 +312,7 @@ then
     echo "Adapter trimming complete."
 
     echo "Filtering out low-complexity reads..."
-    if [ $ICOMP -gt 0 ]
+    if [ $(echo "$ICOMP > 0" | bc) -eq 1 ]
     then
         python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq $ICOMP
     else
@@ -414,21 +414,21 @@ then
     python $bias_pipe/bam2npy.py $bam $chroms $bamnpy
     python $bias_pipe/bam2npy.py $fullbam $chroms $fullbamnpy
     # compute nucleotide bias
-    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms 1 $bias_outdir/$sample_name.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py $bamnpy $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute k-mer baseline
-    python $bias_pipe/compute_baseline.py $bamnpy $genome_fasta $chroms $k $baseline --window_max $MARGIN
+    python $bias_pipe/compute_baseline.py $bamnpy $GENOME_FASTA $chroms $k $baseline --window_max $MARGIN
     # compute k-mer bias
-    python $bias_pipe/compute_bias.py $bamnpy $genome_fasta $chroms $k $kmer_bias --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py $bamnpy $GENOME_FASTA $chroms $k $kmer_bias --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute tile covariance matrix
-    python $bias_pipe/correlate_bias.py $bamnpy $genome_fasta $chroms $kmer_bias $tile_cov --margin $MARGIN
+    python $bias_pipe/correlate_bias.py $bamnpy $GENOME_FASTA $chroms $kmer_bias $tile_cov --margin $MARGIN
     # correct bias in subset
-    python $bias_pipe/correct_bias.py $bamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/unused_slot.csv $corrected_weights $tile_cov --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/correct_bias.py $bamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.csv $corrected_weights $tile_cov --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute corrected nucleotide bias
-    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py $corrected_weights $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # comput corrected k-mer bias
-    python $bias_pipe/compute_bias.py $corrected_weights $genome_fasta $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py $corrected_weights $GENOME_FASTA $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # apply bias correction to full bam file
-    python $bias_pipe/correct_bias.py $fullbamnpy $genome_fasta $chroms $baseline $kmer_bias $bias_outdir/unused_slot.full.csv $corrected_full_weights $tile_cov --read_len $read_len --margin $MARGIN
+    python $bias_pipe/correct_bias.py $fullbamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.full.csv $corrected_full_weights $tile_cov --read_len $read_len --margin $MARGIN
     # output reweighted bam file (weights stored to XW tag)
     python $bias_pipe/npy2bam.py $chroms $corrected_full_weights $fullbam full.adjusted.bam --tag
     # resort adjusted bam file by read name
