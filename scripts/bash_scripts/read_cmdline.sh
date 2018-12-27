@@ -12,6 +12,8 @@ while [ "$1" != "" ]; do
                                 ;;
     --lmod )                    LMOD=1
                                 ;;
+    -B |--bias )                BIAS="true"
+                                ;;
     --ram )                     shift; RAM=$1
                                 ;;
     --cpus )                    shift; CPUS=$1
