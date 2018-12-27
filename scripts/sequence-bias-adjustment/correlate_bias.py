@@ -15,6 +15,20 @@ MEMORY_LIMIT = 32000000000 # 32 Gb (on bigmem, hopefully)
 CHROMS = None
 COMPL = maketrans("ACGTacgt", "TGCATGCA")
 
+parser = argparse.ArgumentParser(description = "Compute bias correlation across read-relative positions")
+parser.add_argument("bam", help="BAM.npy file")
+parser.add_argument("ref", help="Fasta file")
+parser.add_argument("chroms", help="Chromosome file")
+parser.add_argument("bias", help="Bias (CSV) file")
+parser.add_argument("out", help="Output (npy) file")
+parser.add_argument("--limit", help="Maximum reads to process", type=int)
+parser.add_argument("--tile", help="Tile based on k-mer size?", action="store_true")
+parser.add_argument("--plot", help="Plot covariance matrix?", action="store_true")
+parser.add_argument("--clip", help="Clip weights", type=int)
+parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
+args = parser.parse_args()
+
+
 def read_bias(f,MARGIN=args.margin):
   data = [line.strip().split(',') for line in open(f).read().strip().split('\n')]
   bias = [{} for i in xrange(MARGIN*2+1)]
@@ -117,17 +131,4 @@ def main(bam_npy_file, ref_file, chrom_file, bias_file, out_file, read_limit=Non
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description = "Compute bias correlation across read-relative positions")
-  parser.add_argument("bam", help="BAM.npy file")
-  parser.add_argument("ref", help="Fasta file")
-  parser.add_argument("chroms", help="Chromosome file")
-  parser.add_argument("bias", help="Bias (CSV) file")
-  parser.add_argument("out", help="Output (npy) file")
-  parser.add_argument("--limit", help="Maximum reads to process", type=int)
-  parser.add_argument("--tile", help="Tile based on k-mer size?", action="store_true")
-  parser.add_argument("--plot", help="Plot covariance matrix?", action="store_true")
-  parser.add_argument("--clip", help="Clip weights", type=int)
-  parser.add_argument("--margin", help="Width around read start to capture", type=int, default=40)
-  args = parser.parse_args()
-
   main(args.bam, args.ref, args.chroms, args.bias, args.out, args.limit, args.tile, args.plot, args.clip, args.margin)
