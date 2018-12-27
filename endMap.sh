@@ -378,12 +378,10 @@ eval "STAR $star_params_allreads >& $sample_name.star.log"
 echo Generating bedgraph files...
 samtools view -H star/Aligned.out.bam | grep '@SQ' | sed 's/^@SQ\tSN://' | sed 's/\tLN:/\t/' > length.table
 
-if [[ $BIAS == "true" ]]
+if [ $BIAS -eq 1 ]
 then
     cd $sample_dir
     samtools view -h star/Aligned.out.bam > full.unsorted.sam
-    #TODO: Fix module control, update so all scripts are Python3+ compatible
-    ml Python/3.5.2-foss-2016b
     python $python_dir/sam_subset.py \
         -F $GENOME_FASTA \
         -A $ANNOTATION_GFF \
@@ -400,7 +398,6 @@ then
     # https://github.com/txje/sequence-bias-adjustment
     
     # setup environment
-    ml pysam/0.9.1.4-foss-2016a-Python-2.7.11
     bias_pipe=$root_dir/scripts/sequence-bias-adjustment
     bias_outdir=$sample_dir/seqbias
     k=3
@@ -423,26 +420,26 @@ then
       echo "$sample_name read length adjusted to: $read_len"
     fi
     # convert bam to npy array
-    python $bias_pipe/bam2npy.py $bam $chroms $bamnpy
-    python $bias_pipe/bam2npy.py $fullbam $chroms $fullbamnpy
+    python $bias_pipe/bam2npy.py3 $bam $chroms $bamnpy
+    python $bias_pipe/bam2npy.py3 $fullbam $chroms $fullbamnpy
     # compute nucleotide bias
-    python $bias_pipe/compute_bias.py $bamnpy $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py3 $bamnpy $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute k-mer baseline
-    python $bias_pipe/compute_baseline.py $bamnpy $GENOME_FASTA $chroms $k $baseline --window_max $MARGIN
+    python $bias_pipe/compute_baseline.py3 $bamnpy $GENOME_FASTA $chroms $k $baseline --window_max $MARGIN
     # compute k-mer bias
-    python $bias_pipe/compute_bias.py $bamnpy $GENOME_FASTA $chroms $k $kmer_bias --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py3 $bamnpy $GENOME_FASTA $chroms $k $kmer_bias --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute tile covariance matrix
-    python $bias_pipe/correlate_bias.py $bamnpy $GENOME_FASTA $chroms $kmer_bias $tile_cov --margin $MARGIN
+    python $bias_pipe/correlate_bias.py3 $bamnpy $GENOME_FASTA $chroms $kmer_bias $tile_cov --margin $MARGIN
     # correct bias in subset
-    python $bias_pipe/correct_bias.py $bamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.csv $corrected_weights $tile_cov --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/correct_bias.py3 $bamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.csv $corrected_weights $tile_cov --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # compute corrected nucleotide bias
-    python $bias_pipe/compute_bias.py $corrected_weights $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py3 $corrected_weights $GENOME_FASTA $chroms 1 $bias_outdir/$sample_name.${k}mer_adjusted.nucleotide_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # comput corrected k-mer bias
-    python $bias_pipe/compute_bias.py $corrected_weights $GENOME_FASTA $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
+    python $bias_pipe/compute_bias.py3 $corrected_weights $GENOME_FASTA $chroms $k $bias_outdir/$sample_name.${k}mer_adjusted.${k}mer_frequencies.csv --read_len $read_len --max_at_pos 5 --margin $MARGIN
     # apply bias correction to full bam file
-    python $bias_pipe/correct_bias.py $fullbamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.full.csv $corrected_full_weights $tile_cov --read_len $read_len --margin $MARGIN
+    python $bias_pipe/correct_bias.py3 $fullbamnpy $GENOME_FASTA $chroms $baseline $kmer_bias $bias_outdir/unused_slot.full.csv $corrected_full_weights $tile_cov --read_len $read_len --margin $MARGIN
     # output reweighted bam file (weights stored to XW tag)
-    python $bias_pipe/npy2bam.py $chroms $corrected_full_weights $fullbam full.adjusted.bam --tag
+    python $bias_pipe/npy2bam.py3 $chroms $corrected_full_weights $fullbam full.adjusted.bam --tag
     # resort adjusted bam file by read name
     samtools view -h -n full.adjusted.bam > $sample_name.sam
     # cleanup temp files
@@ -451,7 +448,7 @@ else
     samtools view -h star/Aligned.out.bam > $sample_name.sam
 fi
 
-if [[ $BIAS == "true" ]]
+if [ $BIAS -eq 1 ]
 then
     if [[ $library_type == "5P" ]]
     then
