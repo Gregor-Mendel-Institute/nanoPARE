@@ -120,7 +120,7 @@ echo "Config settings:"
 . $bash_dir/list_settings.sh
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools --python )
+REQUIRED_MODULES=( --bedtools --python2018 )
 . $bash_dir/load_modules.sh
 echo " "
 

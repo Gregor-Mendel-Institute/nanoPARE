@@ -18,7 +18,7 @@ then
         if containsElement "$PROGRAM_NAME" "${REQUIRED_MODULES[@]}"
         then
             echo "Loading module $MODULE_NAME"
-            eval "module load $MODULE_NAME"
+            module load $MODULE_NAME
         fi
     done < $resource_dir/OPTIONS_lmod 
 fi

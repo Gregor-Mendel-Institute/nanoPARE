@@ -115,7 +115,7 @@ echo "Config settings:"
 . $bash_dir/list_settings.sh
 
 # Environment modules to load with Lmod (if option --lmod is passed)
-REQUIRED_MODULES=( --bedtools )
+REQUIRED_MODULES=( --bedtools --python2018 )
 . $bash_dir/load_modules.sh
 echo " "
 
@@ -200,11 +200,11 @@ echo "Merged coverage files generated."
 # Merge all touching/overlapping features from all reps
 # Keep only replicable features (present in more than one library)
 bedtools sort -i $SAMPLE_TYPE.all.bed |\
-    bedtools merge -s -c 5 -o count -d 0 |\
+    bedtools merge -s -c 6,5 -o distinct,count -d 0 |\
     grep -v -P '\t1$' |\
     awk -v nm="$SAMPLE_TYPE" '{ printf $1"\t"$2"\t"$3"\t"nm"."NR"\t"$5"\t"$4"\n" }' > $SAMPLE_TYPE.rep.bed
 
-rm $SAMPLE_TYPE.all.bed
+#rm $SAMPLE_TYPE.all.bed
 
 bedfile=$SAMPLE_TYPE.rep.bed
 
@@ -353,7 +353,7 @@ cat $SAMPLE_TYPE.capped.sorted.bed $SAMPLE_TYPE.noncapped.sorted.bed | bedtools 
 
 rm -f $SAMPLE_TYPE.capped.sorted.bed $SAMPLE_TYPE.noncapped.sorted.bed \
       $SAMPLE_TYPE.all_features.bed $SAMPLE_TYPE.peaks.bed $SAMPLE_TYPE.only_peaks.bed \
-      $SAMPLE_TYPE.rep.bed
+#      $SAMPLE_TYPE.rep.bed
 
 echo "Cap masking bedgraph files..."
 
