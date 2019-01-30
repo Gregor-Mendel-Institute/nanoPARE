@@ -1,6 +1,6 @@
 # nanoPARE Analysis Tools
 A data analysis pipeline companion to Schon, Kellner, et al.:  
-"nanoPARE: Parallel analysis of RNA 5′ ends from low-input RNA"  
+["nanoPARE: Parallel analysis of RNA 5′ ends from low-input RNA"](https://genome.cshlp.org/content/28/12/1931)
   
 <img width="200" alt="nanoPARE logo" src="/resources/images/nanoPARE_logo.png">
   
