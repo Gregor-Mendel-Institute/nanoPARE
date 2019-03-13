@@ -9,5 +9,6 @@
 --samtools2016 SAMtools/1.5-foss-2016b
 --stringtie StringTie/1.3.2d-foss-2016b
 --python Python/3.5.2-foss-2016b
+--python2018 Python/3.6.6-foss-2018b
 --pysam pysam/0.9.1.4-foss-2016a-Python-2.7.11
 --numpy numpy/1.10.4-foss-2016a-Python-2.7.11
