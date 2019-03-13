@@ -2,7 +2,7 @@ import re
 import sys
 import argparse
 import fasta_utils as fu
-import multiprocessing as mp
+import numpy as np
 
 ########################
 ### ARGUMENT PARSING ###
@@ -29,7 +29,6 @@ parser.add_argument('-O','--output', default='transcript_coverage.bedgraph', typ
 parser.add_argument('--write_fasta', default='', type=str,
                     help="(optional) Filename to output the transcript FASTA file.")
 
-
 args = parser.parse_args()
 
 ####################
@@ -45,115 +44,57 @@ def flatten(list_of_lists):
     """Collapses a list/tuple of lists into a single list"""
     return [item for sublist in list_of_lists for item in sublist]
 
-
-def write_bedgraph_from_dict(input, output_filename, digits=2, parallel=False):
-    """Writes unsorted BEDGRAPH to output_filename from input dict"""
+def vector_to_bedgraph_lines(value_vector, chrom, chromstart=0, digits=2, multi_key=[]):
+    """Converts a vector of values to bedgraph format, yielding lines."""
+    start = 0
+    prevpos = 0
+    prevcount = None
+    position = None
+    vpos = None
+    # Iterate through every position with values in the dict
     
-    def writer(merge_filename,shared_queue,stop_token):
-        """Initializes a writer to output the mp queue."""
-    
-        dest_file = open(merge_filename,'w')
-        while True:
-            line = shared_queue.get()
-            if line == stop_token:
-                dest_file.close()
-                return
-            dest_file.write(line)
-    
-    
-    def generate_bedgraph_lines(values_dict, chrom, queue, parallel=parallel):
-        """Converts dict of values to bedgraph format"""
-        start = 0
-        prevpos = 0
-        prevcount = None
-        chromlen = len(input[chrom])
-        position = None
-        # Iterate through every position with values in the dict
-        for position in sorted(list(values_dict.keys())):
-            count = round(values_dict[position],digits)
-            if count != prevcount or int(position) > 1 + prevpos:
-                # The newly encountered value is not a continuation
-                # of the previous value. Write the old run and start another.
-                if prevcount > 0:
-                    line_to_write = '\t'.join(
-                        [
-                            str(i) for i in [
-                                chrom,
-                                start,
-                                prevpos + 1,
-                                prevcount
-                            ]
-                        ]
-                    ) + '\n'
-                    
-                    if parallel:
-                        # Write the old run to outfile
-                        queue.put(line_to_write)
-                    else:
-                        # Write the old run to outfile
-                        queue.write(line_to_write)
-                        
-                start = position
-            prevcount = count
-            prevpos = int(position)
+    for vpos in [k for k,v in enumerate(value_vector) if v != 0]:
+        if multi_key:
+            all_values = [str(round(value_vector[vpos].get(k,0),digits)) for k in multi_key]
+            count = '\t'.join(all_values)
+        else:
+            count = round(value_vector[vpos],digits)
         
-        if position and prevcount > 0:
-            line_to_write = '\t'.join(
-                [
-                    str(i) for i in [
-                        chrom,
-                        start,
-                        prevpos + 1,
-                        prevcount
+        if count != prevcount or int(vpos) > 1 + prevpos:
+            # The newly encountered value is not a continuation
+            # of the previous value. Write the old run and start another.
+            if prevcount and prevcount != 0:
+                line_to_write = '\t'.join(
+                    [
+                        str(i) for i in [
+                            chrom,
+                            start + chromstart,
+                            prevpos + 1 + chromstart,
+                            prevcount
+                        ]
                     ]
-                ]
-            ) + '\n'
-            
-            if parallel:
-                queue.put(line_to_write)
-            else:
-                queue.write(line_to_write)
-    
-    
-    if parallel:
-        queue = mp.Queue()
-        STOP_TOKEN = "FINISHED"
-        writer_process = mp.Process(
-            target=writer,
-            args=(output_filename,queue,STOP_TOKEN)
-        )
-        writer_process.start()
-        all_threads = []
-
-        for chrom in sorted(list(input.keys())):
-            all_threads.append(
-                mp.Process(
-                    target=generate_bedgraph_lines,
-                    args=(
-                        input[chrom],
-                        chrom,
-                        queue
-                    )
                 )
-            )
-        for i in range(len(all_threads)):
-            all_threads[i].start()
-        while len(mp.active_children()) > 1:
-            time.sleep(1)
-        queue.put("FINISHED")
-        while len(mp.active_children()) > 0:
-            time.sleep(1)
-    else:
-        queue = open(output_filename, 'w')
-        for chrom in sorted(list(input.keys())):
-            generate_bedgraph_lines(
-                input[chrom],
-                chrom,
-                queue,
-                parallel = False
-            )
-        queue.close()
+                
+                yield line_to_write
+            
+            start = vpos
+        
+        prevcount = count
+        prevpos = int(vpos)
 
+    if vpos and prevcount and prevcount != 0:
+        line_to_write = '\t'.join(
+            [
+                str(i) for i in [
+                    chrom,
+                    start + chromstart,
+                    prevpos + 1 + chromstart,
+                    prevcount
+                ]
+            ]
+        )
+        
+        yield line_to_write
 
 ####################
 # LOAD ENVIRONMENT #
@@ -228,36 +169,37 @@ for chrom in genome.keys():
 # 'coverage' is a dictionary of float vectors for each nucleotide in the genome.
 # Contains the value of the BEDGRAPH file at each position.
 coverage = {}
-coverage['plus'] = {}
-coverage['minus'] = {}
+coverage['+'] = {}
+coverage['-'] = {}
 
 for chrom,chromlen in chromosomes.items():
-    coverage['plus'][chrom] = [0]*chromlen
-    coverage['minus'][chrom] = [0]*chromlen
+    coverage['+'][chrom] = np.zeros(chromlen, dtype='float32')
+    coverage['-'][chrom] = np.zeros(chromlen, dtype='float32')
 
-# Populate the plus bedgraph dict
+# Populate the + bedgraph dict
 coverage_file = open(args.bedgraph_plus)
 for line in coverage_file:
     chrom,start,end,count = line.rstrip().split()
     count = float(count)
-    coverage['plus'][chrom][int(start):int(end)] = \
-        [count]*(int(end)-int(start))
+    coverage['+'][chrom][int(start):int(end)] += count
 
-# Populate the minus bedgraph dict
+# Populate the - bedgraph dict
 coverage_file = open(args.bedgraph_minus)
 for line in coverage_file:
     chrom,start,end,count = line.rstrip().split()
     count = float(count)
-    coverage['minus'][chrom][int(start):int(end)] = \
-        [count]*(int(end)-int(start))
+    coverage['-'][chrom][int(start):int(end)] += count
 
 # Open a FASTA file for the picked IDs
 if args.write_fasta:
     fasta_outfile = open(args.write_fasta,'w')
+else:
+    del genome
 
 # Generate an output dict of transcript-level coverages
-output_coverage_dict = {}
+output_file = open(args.output, 'w')
 
+print('# Converting genome BEDGRAPH to transcript coordinates.')
 for ID in picked_IDs:
     if ID not in ref_transcripts:
         print('# WARNING: {} not found'.format(ID))
@@ -267,37 +209,34 @@ for ID in picked_IDs:
     strand = ref_transcripts[ID]['strand']
     exon_starts = sorted(ref_transcripts[ID]['start'])
     exon_ends = sorted(ref_transcripts[ID]['end'])
-    
-    positions = flatten(
-        [list(range(a - 1,b)) for a,b in zip(exon_starts,exon_ends)]
-    )
-    
-    if strand == '+':
-        transcript_coverage = [coverage['plus'][chrom][i] for i in positions]
-        if args.write_fasta:
-            transcript_fasta = ''.join([genome[chrom][i] for i in positions])
-            fasta_outfile.write('>{}\n'.format(ID))
-            fasta_outfile.write('{}\n'.format(transcript_fasta))
-    elif strand == '-':
-        transcript_coverage = list(reversed([coverage['minus'][chrom][i] for i in positions]))
-        if args.write_fasta:
-            transcript_fasta = fu.rc(''.join([genome[chrom][i] for i in positions]))
-            fasta_outfile.write('>{}\n'.format(ID))
-            fasta_outfile.write('{}\n'.format(transcript_fasta))
-    else:
+
+    transcript_coverage = np.empty(0, dtype='float32')
+    if args.write_fasta:
+        transcript_fasta = ''
+
+    if strand not in ['+','-']:
         print('# WARNING: {} is unstranded'.format(ID))
         continue
-    
-    output_coverage_dict[ID] = {}
-    for i in range(len(transcript_coverage)):
-        output_coverage_dict[ID][i] = transcript_coverage[i]
 
+    for a,b in zip(exon_starts, exon_ends):
+        exon = coverage[strand][chrom][a-1:b]
+        transcript_coverage = np.append(transcript_coverage, exon)
+        if args.write_fasta:
+            transcript_fasta += genome[chrom][a-1:b]
+    
+    
+    if strand == '-': # Flip the strand for minus-stranded data
+        transcript_coverage = transcript_coverage[::-1]
+        if args.write_fasta:
+            transcript_fasta = fu.rc(transcript_fasta)
+
+    for line in vector_to_bedgraph_lines(transcript_coverage, ID):
+        output_file.write(line+'\n')
+    
+    if args.write_fasta:
+        fasta_outfile.write('>{}\n'.format(ID))
+        fasta_outfile.write('{}\n'.format(transcript_fasta))
+
+output_file.close()
 if args.write_fasta:
     fasta_outfile.close()
-
-# Write transcript-level bedgraph to the output file
-write_bedgraph_from_dict(
-    output_coverage_dict,
-    output_filename=args.output
-)
-
