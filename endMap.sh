@@ -210,7 +210,7 @@ do
     if [[ $fastq_file = *.gz ]]
     then
         echo "Unzipping fastq file $fastq_file to the sample temp directory"
-        gunzip -k -c $fastq_dir/$fastq_file > $sample_dir/"$sample_name"."$mate_number".fastq
+        gunzip -c $fastq_dir/$fastq_file > $sample_dir/"$sample_name"."$mate_number".fastq
     else
         echo "Copying fastq file $fastq_file to the sample temp directory"
         cat $fastq_dir/$fastq_file > $sample_dir/"$sample_name"."$mate_number".fastq
