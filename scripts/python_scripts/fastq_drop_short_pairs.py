@@ -1,52 +1,52 @@
-'''
-Command-line: [1]directory [2]mate1 [3]mate2 [4]out1 [5]out2 [6]minlen
-'''
 import sys
-directory,mate1,mate2,out1,out2,minlen=sys.argv[1:7]
-minlen=int(minlen)
-### USER DEFINED ###
-# minlen=5
-# directory='C:/Users/schon.admin/Desktop/'
-# mate1='testfile1.txt'
-# mate2='testfile2.txt'
-# out1='testfile1_drop.txt'
-# out2='testfile2_drop.txt'
-####################
-if not directory.endswith('/'):
-    directory=directory+'/'
-file1=open(directory+mate1)
-file2=open(directory+mate2)
-num_lines1 = sum(1 for line in file1)
-num_lines2 = sum(1 for line in file2)
-assert num_lines1 == num_lines2
-print num_lines1,num_lines2
-file1.close()
-file2.close()
-file1=open(directory+mate1)
-file2=open(directory+mate2)
-tmp1=open(directory+out1,'w')
-tmp2=open(directory+out2,'w')
-print "Beginning to clean..."
+import os
+import argparse
+if sys.version_info >= (3,0):
+    izip = zip
+else:
+    from itertools import izip
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--minlen", dest='MINLEN',
+    help="Minimum length for a FASTQ read to keep.",
+    default=12, type=int
+)
+parser.add_argument(
+    "-O", "--output", dest='OUTPUT', type=str, 
+    default=['cleaned.1.fastq','cleaned.2.fastq'], nargs=2,
+    help="Filepaths to write processed FASTQ files."
+)
+parser.add_argument(
+    "FILENAME", nargs=2
+)
+args = parser.parse_args()
+
+file1=open(args.FILENAME[0])
+file2=open(args.FILENAME[1])
+tmp1=open(args.OUTPUT[0],'w')
+tmp2=open(args.OUTPUT[1],'w')
+print("Beginning to clean {} and {}...".format(args.FILENAME[0],args.FILENAME[1]))
 entry1=[]
 entry2=[]
 linecounter=0
 tooshortcount=0
-for i in range(num_lines1):
+for line1, line2 in izip(file1, file2):
+    line1 = line1.rstrip()
+    line2 = line2.rstrip()
     linecounter+=1
-    line1=file1.readline().rstrip()
-    line2=file2.readline().rstrip()
     if linecounter % 4 == 1:
         entry1=[]
         entry2=[]
     entry1.append(line1)
     entry2.append(line2)
     if linecounter % 4 == 0:
-        if len(entry1[1])>=minlen and len(entry2[1])>=minlen:
+        if len(entry1[1]) >= args.MINLEN and len(entry2[1]) >= args.MINLEN:
             tmp1.write('\n'.join(entry1)+'\n')
             tmp2.write('\n'.join(entry2)+'\n')
         else:
             tooshortcount+=1
 tmp1.close()
 tmp2.close()
-print "Finished cleaning."
-print str(tooshortcount),"read pairs removed."
+print("Finished cleaning.")
+print(str(tooshortcount),"read pairs removed.")

@@ -317,15 +317,15 @@ then
         fi
     fi
       
-    python $python_dir/fastq_drop_short_reads.py $sample_dir "$sample_name"_trimmed.fastq "$sample_name"_cleaned.fastq $minimum_readlength
+    python $python_dir/fastq_drop_short_reads.py -O $sample_dir/"$sample_name"_cleaned.fastq --minlen $minimum_readlength $sample_dir/"$sample_name"_trimmed.fastq
     
     echo "Removing trim intermediates"
     rm -f "$sample_name"_trim1.fastq "$sample_name"_adaptertrim.fastq "$sample_name"_trimmed.fastq
     echo "Adapter trimming complete."
-
-    echo "Filtering out low-complexity reads..."
+    
     if [ $(echo "$ICOMP > 0" | bc) -eq 1 ]
     then
+        echo "Filtering out low-complexity reads..."
         python $python_dir/fastq_complexity_filter.py $sample_dir "$sample_name"_cleaned.fastq "$sample_name"_cleaned.1.fastq $ICOMP
     else
         cat "$sample_name"_cleaned.fastq > "$sample_name"_cleaned.1.fastq
@@ -356,13 +356,15 @@ else
 
         echo "Cleaning reads with fastq_drop_short_pairs.py"
         # directory,mate1,mate2,out1,out2,minlen=sys.argv[1:7]
-        echo "python $python_dir/fastq_drop_short_pairs.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name"_cleaned.1.fastq "$sample_name"_cleaned.2.fastq $minimum_pairlength"
-        eval "python $python_dir/fastq_drop_short_pairs.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name"_cleaned.1.fastq "$sample_name"_cleaned.2.fastq $minimum_pairlength"
+        CMDline="python $python_dir/fastq_drop_short_pairs.py --minlen $minimum_pairlength -O $sample_dir/"$sample_name"_cleaned.1.fastq $sample_dir/"$sample_name"_cleaned.2.fastq $sample_dir/"$sample_name"_adaptertrim.1.fastq $sample_dir/"$sample_name"_adaptertrim.2.fastq"
+        echo $CMDline
+        eval $CMDline
         rm "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name".1.fastq "$sample_name".2.fastq
     else
         echo "Cleaning reads with fastq_drop_short_reads.py"
-        echo "python $python_dir/fastq_drop_short_reads.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_cleaned.1.fastq $minimum_readlength"
-        eval "python $python_dir/fastq_drop_short_reads.py $sample_dir "$sample_name"_adaptertrim.1.fastq "$sample_name"_cleaned.1.fastq $minimum_readlength"
+        CMDline="python $python_dir/fastq_drop_short_reads.py -O $sample_dir/"$sample_name"_cleaned.1.fastq --minlen $minimum_readlength $sample_dir/"$sample_name"_adaptertrim.1.fastq"
+        echo $CMDline
+        eval $CMDline
         rm "$sample_name"_adaptertrim.1.fastq "$sample_name"_adaptertrim.2.fastq "$sample_name".1.fastq "$sample_name".2.fastq
     fi
     echo "Adapter trimming complete."
@@ -370,6 +372,7 @@ fi
 
 echo "### PHASE 2: MAPPING READS TO THE GENOME WITH STAR ###"
 mkdir -p $sample_dir/star
+cd $sample_dir
 echo "STAR $star_params_allreads >& $sample_name.star.log"
 eval "STAR $star_params_allreads >& $sample_name.star.log"
 
@@ -539,7 +542,7 @@ echo "Moving final files to results folder..."
 mkdir -p $results_dir/EndMap/$sample_name
 cp $sample_dir/*.bedgraph $results_dir/EndMap/$sample_name/
 
-if [[ $library_type == "5P" ]]
+if [ $(echo "$ICOMP > 0" | bc) -eq 1 ]
 then
     cat $sample_dir/comptable.tsv > $results_dir/EndMap/$sample_name/"$sample_name".comptable.tsv
 fi
