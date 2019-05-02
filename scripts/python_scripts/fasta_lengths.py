@@ -16,13 +16,15 @@ chromosomes={}
 genome_file=open(genome_FASTA)
 for line in genome_file:
     line=line.rstrip()
-    if line[0]=='>':
-        if chrom!='none':
-            genome[chrom]=''.join(x)
-        chrom=line[1:len(line)].split(split_on)[0]
-        x=[]
-        continue
-    x.append(line)
+    if len(line) > 0:
+        if line[0]=='>':
+            if chrom!='none':
+                genome[chrom]=''.join(x)
+            chrom=line[1:len(line)].split(split_on)[0]
+            x=[]
+            continue
+        x.append(line)
+
 if chrom!='none':
     genome[chrom]=''.join(x)
 
