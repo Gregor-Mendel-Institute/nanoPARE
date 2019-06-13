@@ -30,6 +30,10 @@ while [ "$1" != "" ]; do
                                 ;;
     -T | --type )               shift; SAMPLE_TYPE=$1;
                                 ;;
+    --gtf_gene_tag )            shift; GTF_GENE_TAG=$1;
+                                ;;
+    --gtf_transcript_tag )      shift; GTF_TRANSCRIPT_TAG=$1;
+                                ;;
     --icomp )                   shift; ICOMP=$1
                                 ;;
     --uug )                     shift; UUG=$1
