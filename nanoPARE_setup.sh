@@ -17,12 +17,14 @@ The genome index is written to temp/genome_index.
 Other setup files are added to the resources/ directory.
 
 Optional arguments:
--R | --reference     Reference table (default: resources/reference.table)
--G | --genome        Genome FASTA file (default: resources/genome.fasta)
--A | --annotation    Transcript GFF file (default: resources/annotation.gff)
---lmod               Load required modules with Lmod (default: false)
---ram                Amount of available RAM in gigabytes (default: 30)
---cpus               Number of cores available for multithreaded programs (default: 1)
+-R | --reference      Reference table (default: resources/reference.table)
+-G | --genome         Genome FASTA file (default: resources/genome.fasta)
+-A | --annotation     Transcript GFF file (default: resources/annotation.gff)
+--lmod                Load required modules with Lmod (default: false)
+--ram                 Amount of available RAM in gigabytes (default: 30)
+--cpus                Number of cores available for multithreaded programs (default: 1)
+--gtf_gene_tag        Passes to STAR --sjdbGTFtagExonParentGene (default: gene_id)
+--gtf_transcript_tag  Passes to STAR --sjdbGTFtagExonParentTranscript (default: transcript_id)
 
 All steps of this pipeline access the default files for -R, -G, and -A, respectively.
 You can replace these 3 items in the resources folder for simplicity.
@@ -53,6 +55,14 @@ genome_index_dir=$temp_dir/genome_index
 if [ -z "$GENOME_FASTA" ]
 then
     GENOME_FASTA=$resource_dir/genome.fasta # If not already in environment, set as default value
+fi
+if [ -z "$GTF_TRANSCRIPT_TAG" ]
+then
+    GTF_TRANSCRIPT_TAG="transcript_id"
+fi
+if [ -z "$GTF_GENE_TAG" ]
+then
+    GTF_GENE_TAG="gene_id"
 fi
 if [ -z "$REFERENCE_TABLE" ]
 then
@@ -107,7 +117,9 @@ genome_index_command="STAR \
 --outFileNamePrefix $log_dir/ \
 --genomeFastaFiles $GENOME_FASTA \
 --genomeSAindexNbases $index_base_number \
---sjdbGTFfile $ANNOTATION_GFF"
+--sjdbGTFfile $ANNOTATION_GFF \
+--sjdbGTFtagExonParentTranscript $GTF_TRANSCRIPT_TAG \
+--sjdbGTFtagExonParentGene $GTF_GENE_TAG"
 
 echo "$genome_index_command"
 eval "$genome_index_command"
@@ -151,7 +163,7 @@ bedtools sort -i class.exons_by_gene.gff |\
     awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t0\t"$7"\n" }' |\
     bedtools merge -s -c 4 -o distinct -delim ";" |\
     awk '{ printf $1"\t"$2"\t"$3"\t"$5"\t0\t"$4"\n" }' |\
-    sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+    sed 's/;[^\t]*//' |\
     bedtools sort | sort -k 4 > class.exons_by_gene.geneorder.bed
 
 bedtools sort -i class.exons_by_gene.geneorder.bed > class.exons_by_gene.bed
@@ -161,7 +173,7 @@ bedtools sort -i class.terminal_exons_by_gene.gff |\
     awk '{ printf $1"\t"$4-1"\t"$5"\t"$9"\t0\t"$7"\n" }' |\
     bedtools merge -s -c 4 -o distinct -delim ";" |\
     awk '{ printf $1"\t"$2"\t"$3"\t"$5"\t0\t"$4"\n" }' |\
-    sed 's/\(.\+\)\t\([^;]*\?\);.\+\t/\1\t\2\t/' |\
+    sed 's/;[^\t]*//' |\
     bedtools sort > class.terminal_exons_by_gene.bed
 
 python $python_dir/bed_deduplicate.py \
