@@ -2,7 +2,7 @@
 __author__ == "Falko Hofmann"
 __email__ == "falkohofmann@gmail.com"
 """
-TODO: add module docstring
+Module that runs convolution with different kernels on a bedgraph.
 """
 import logging
 import argparse
