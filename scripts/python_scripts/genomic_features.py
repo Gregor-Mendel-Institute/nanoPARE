@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+__author__ == "Falko Hofmann"
+__email__ == "falkohofmann@gmail.com"
 """
 This module is a data container for transcripts parsed via gff_utils or bed_utils.
 Transcripts should be the only class you actually need to import.

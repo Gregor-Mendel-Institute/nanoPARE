@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+__author__ == "Falko Hofmann"
+__email__ == "falkohofmann@gmail.com"
+
 """
 This  module is for parsing of bed files.
 """

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+__author__ == "Falko Hofmann"
+__email__ == "falkohofmann@gmail.com"
 """
 This module is for parsing and manipulating transcripts from gtf and gff3 files.
 
