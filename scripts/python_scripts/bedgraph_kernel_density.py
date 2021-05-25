@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-__author__ == "Falko Hofmann"
-__email__ == "falkohofmann@gmail.com"
+__author__ = "Falko Hofmann"
+__email__ = "falkohofmann@gmail.com"
 """
 Module that runs convolution with different kernels on a bedgraph.
 """

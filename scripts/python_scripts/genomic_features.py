@@ -7,8 +7,8 @@ Example:
     from genomic_features import Transcripts
 
 """
-__author__ == "Falko Hofmann"
-__email__ == "falkohofmann@gmail.com"
+__author__ = "Falko Hofmann"
+__email__ = "falkohofmann@gmail.com"
 
 import logging
 from abc import ABC, abstractmethod

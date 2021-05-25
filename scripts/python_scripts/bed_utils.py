@@ -2,8 +2,8 @@
 """
 This  module is for parsing of bed files.
 """
-__author__ == "Falko Hofmann"
-__email__ == "falkohofmann@gmail.com"
+__author__ = "Falko Hofmann"
+__email__ = "falkohofmann@gmail.com"
 
 # TODO: add parsing safety checks.
 

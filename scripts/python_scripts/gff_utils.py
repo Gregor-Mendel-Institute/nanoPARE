@@ -8,8 +8,8 @@ Example:
     gu.parse_annotations(files)
 
 """
-__author__ == "Falko Hofmann"
-__email__ == "falkohofmann@gmail.com"
+__author__ = "Falko Hofmann"
+__email__ = "falkohofmann@gmail.com"
 
 import logging
 import re
