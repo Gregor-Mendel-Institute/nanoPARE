@@ -276,6 +276,7 @@ for strand in plus minus
 do
     kernel_density_command="python \
         $python_dir/bedgraph_kernel_density.py \
+        --single_stream \
         -B $sample_dir/"$library_type"."$strand"_subtract.bedgraph \
         -O $sample_dir/"$library_type"."$strand"_smooth.bedgraph \
         -L $resource_dir/length.table \
