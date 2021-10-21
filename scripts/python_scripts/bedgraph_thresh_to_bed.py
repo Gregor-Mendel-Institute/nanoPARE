@@ -47,8 +47,13 @@ parser.add_argument(
     help='Strand of features to output in bed file',
     choices=['+','plus','p','.','-','minus','m'], default='.'
 )
+parser.add_argument(
+    '--single_stream', dest='single_stream', default=False,
+    action='store_true', help='(for very large files) process bedgraph data as a single stream'
+)
 
 args = parser.parse_args()
+args.single_stream = True
 
 if args.strand in ['plus','p']:
     args.strand = '+'
@@ -103,7 +108,7 @@ def writer(merge_filename,shared_queue,stop_token):
             return
         dest_file.write(line)
 
-def find_bed_features(chrom,chromlen,queue):
+def find_bed_features(chrom,chromlen,queue=None,output=None):
     above_thresh = sorted(list(thresh_coverage[chrom]))
     if len(above_thresh) < 2:
         return
@@ -151,23 +156,42 @@ def find_bed_features(chrom,chromlen,queue):
             else:
                 other_peaks = ['-']
             
-            queue.put(
-                '\t'.join(
-                    [
-                        str(i)
-                        for i in [
-                            chrom,
-                            chromStart,
-                            chromEnd,
-                            name,
-                            round(signalValue,2),
-                            args.strand,
-                            peak,
-                            ','.join(other_peaks)
+            if output is not None:
+                output.write(
+                    '\t'.join(
+                        [
+                            str(i)
+                            for i in [
+                                chrom,
+                                chromStart,
+                                chromEnd,
+                                name,
+                                round(signalValue,2),
+                                args.strand,
+                                peak,
+                                ','.join(other_peaks)
+                            ]
                         ]
-                    ]
-                ) + '\n'
-            )
+                    ) + '\n'
+                )
+            else:
+                queue.put(
+                    '\t'.join(
+                        [
+                            str(i)
+                            for i in [
+                                chrom,
+                                chromStart,
+                                chromEnd,
+                                name,
+                                round(signalValue,2),
+                                args.strand,
+                                peak,
+                                ','.join(other_peaks)
+                            ]
+                        ]
+                    ) + '\n'
+                )
 
 # 'chromosomes' contains the lengths of all chromosomes 
 # that BEDGRAPH contains values for.
@@ -210,39 +234,44 @@ for line in coverage_file:
 #        peak            position of peak point source (relative, 0-indexed)
 
 if __name__ == '__main__':
-    queue = mp.Queue()
-    STOP_TOKEN = "FINISHED"
-    writer_process = mp.Process(
-        target=writer,
-        args=(args.bed_out,queue,STOP_TOKEN)
-    )
-    writer_process.start()
-    all_threads = []
-    chromosomes_by_size = [
-        k for v,k in sorted(
-            [(v,k) for k,v in chromosomes.items()]
-            ,reverse=True
+    if args.single_stream:
+        out = open(args.bed_out,'w')
+        for chrom,length in chromosomes.items():
+            find_bed_features(chrom, length, output=out)
+    else:
+        queue = mp.Queue()
+        STOP_TOKEN = "FINISHED"
+        writer_process = mp.Process(
+            target=writer,
+            args=(args.bed_out,queue,STOP_TOKEN)
         )
-    ]
-    for chrom in chromosomes_by_size:
-            all_threads.append(
-                mp.Process(
-                    target=find_bed_features,
-                    args=(
-                        chrom,
-                        chromosomes[chrom],
-                        queue
+        writer_process.start()
+        all_threads = []
+        chromosomes_by_size = [
+            k for v,k in sorted(
+                [(v,k) for k,v in chromosomes.items()]
+                ,reverse=True
+            )
+        ]
+        for chrom in chromosomes_by_size:
+                all_threads.append(
+                    mp.Process(
+                        target=find_bed_features,
+                        args=(
+                            chrom,
+                            chromosomes[chrom],
+                            queue
+                        )
                     )
                 )
-            )
-    
-    for i in range(len(all_threads)):
-        all_threads[i].start()
-    
-    while len(mp.active_children()) > 1:
-        time.sleep(1)
-    
-    queue.put("FINISHED")
-    while len(mp.active_children()) > 0:
-        time.sleep(1)
+        
+        for i in range(len(all_threads)):
+            all_threads[i].start()
+        
+        while len(mp.active_children()) > 1:
+            time.sleep(1)
+        
+        queue.put("FINISHED")
+        while len(mp.active_children()) > 0:
+            time.sleep(1)
     

@@ -295,6 +295,7 @@ do
     fi
     feature_threshold_command="python \
     $python_dir/bedgraph_thresh_to_bed.py \
+    --single_stream \
     -B $sample_dir/"$library_type"."$strand"_smooth.bedgraph \
     -O $sample_dir/"$library_type"."$strand"_features.bed \
     -L $resource_dir/length.table \
