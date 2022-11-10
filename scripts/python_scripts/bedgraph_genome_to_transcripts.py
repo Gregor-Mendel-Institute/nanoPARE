@@ -28,6 +28,8 @@ parser.add_argument('-O','--output', default='transcript_coverage.bedgraph', typ
                     help="Filename to output the transcript-level bedgraph.")
 parser.add_argument('--write_fasta', default='', type=str,
                     help="(optional) Filename to output the transcript FASTA file.")
+parser.add_argument('--delimiter', default='\.', type=str,
+                    help="Character(s) delimiting gene name from isoform number.")
 
 args = parser.parse_args()
 
@@ -103,6 +105,7 @@ def vector_to_bedgraph_lines(value_vector, chrom, chromstart=0, digits=2, multi_
 # TODO: retool gff_utils to import gff3 format files
 ref_transcripts = {}
 refGFF = open(args.reference_GFF)
+delim = args.delimiter
 for line in refGFF:
     if line[0] == '#':continue
     chrom,source,gtype,start,end,score,strand,phase,other = line.rstrip().split('\t')
@@ -110,14 +113,14 @@ for line in refGFF:
         continue
     
     parent = re.search('^.*;?Parent=([^;]+);?.*$',other).groups()[0]
-    ID = re.search('id=(.+?)[\.:;].+$',other)
+    ID = re.search('(gene|transcript)_id=(.+?)[\.:;].+$',other)
     if ID:
         ID = ID.groups()[0]
     else:
-        ID = parent.split('\.')[0]
+        ID = parent.split(delim)[0]
     
     iso_length = len(re.findall(',',parent))+1
-    isos = re.search(','.join([ID+'(\.[0-9]+)?']*iso_length),parent).groups()
+    isos = re.search(','.join([ID+'('+delim+'[0-9]+)?']*iso_length),parent).groups()
     iso_ID = parent.split(',')
     for i in iso_ID:
         ref_transcripts[i] = ref_transcripts.get(i,{})

@@ -15,7 +15,7 @@ genome={}
 chromosomes={}
 genome_file=open(genome_FASTA)
 for line in genome_file:
-    line=line.rstrip()
+    line=line.rstrip().split(' ')[0]
     if len(line) > 0:
         if line[0]=='>':
             if chrom!='none':
