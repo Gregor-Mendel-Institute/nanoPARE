@@ -122,24 +122,24 @@ genome_index_command="STAR \
 --sjdbGTFtagExonParentGene $GTF_GENE_TAG"
 
 echo "$genome_index_command"
-eval "$genome_index_command"
+# eval "$genome_index_command"
 echo "Genome index complete."
 echo " " 
 
 echo "### GENERATE TSO MASKING FILES ###"
 
-python $python_dir/fasta_sequence_search.py \
-    $GENOME_FASTA \
-    $resource_dir/mask_sequences.table \
-    -O $resource_dir
+#python $python_dir/fasta_sequence_search.py \
+#    $GENOME_FASTA \
+#    $resource_dir/mask_sequences.table \
+#    -O $resource_dir
 echo "Masking BED files generated."
 echo " "
 
 echo "Generating transcriptome FASTA file."
-python $python_dir/gtf_to_fasta.py \
-    -G $GENOME_FASTA \
-    -A $ANNOTATION_GFF \
-    > $resource_dir/transcriptome.fasta
+#python $python_dir/gtf_to_fasta.py \
+#    -G $GENOME_FASTA \
+#    -A $ANNOTATION_GFF \
+#    > $resource_dir/transcriptome.fasta
 
 echo "### GENERATE ANNOTATION CLASS REFERENCE FILES ###"
 

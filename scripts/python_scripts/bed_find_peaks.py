@@ -52,6 +52,11 @@ parser.add_argument(
     help='minimum score to output a feature',
     default=None
 )
+parser.add_argument(
+    '-C', '--cores', dest='cores', metavar='int',
+    type=int, help='Number of CPU cores to use.',
+    default=6
+)
 
 args = parser.parse_args()
 
@@ -395,25 +400,14 @@ if __name__ == '__main__':
             ,reverse=True
         )
     ]
+    
+    pool = mp.Pool(args.cores)
     for chrom in chromosomes_by_size:
-            all_threads.append(
-                mp.Process(
-                    target=bed_find_peaks,
-                    args=(
-                        chrom,
-                        queue,
-                        False
-                    )
-                )
-            )
+        # Initialize a pool of threads for each chromosome
+        pool.apply_async(bed_find_peaks, (chrom,queue))
     
-    for i in range(len(all_threads)):
-        all_threads[i].start()
-    
-    while len(mp.active_children()) > 1:
-        time.sleep(1)
-    
+    pool.close()
+    pool.join()
     queue.put("FINISHED")
-    while len(mp.active_children()) > 0:
-        time.sleep(1)
-    
+    writer_process.join()
+

@@ -99,6 +99,11 @@ parser.add_argument(
     help="Minimum number of matching nucleotides for a read.",
     default=16, type=int
 )
+parser.add_argument(
+    '-C', '--cores', dest='cores', metavar='int',
+    type=int, help='Number of CPU cores to use.',
+    default=1
+)
 
 args = parser.parse_args()
 
@@ -1490,6 +1495,10 @@ if args.SJ_OUT:
     outfile.close()
 
 for strand in ['+','-']:
+    parallel = args.PARALLEL
+    if args.cores > 1:
+        parallel = True
+    
     print('\t{} {}'.format(args.READTYPE,strand))
     if strand == '+':
         STRAND = 'plus'
@@ -1500,54 +1509,54 @@ for strand in ['+','-']:
         write_bedgraph_from_dict(
             ENDPOINT[strand],
             output_filename='{}_{}_{}.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-            parallel=args.PARALLEL,
+            parallel=parallel,
             multi_key=False
         )
         write_bedgraph_from_dict(
             COVERAGE[strand],
             output_filename='{}_{}_{}_coverage.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-            parallel=args.PARALLEL,
+            parallel=parallel,
             multi_key=False
         )
         if args.SIZE_CLASSES:
             write_bedgraph_from_dict(
                 READLENGTHS[strand],
                 output_filename='{}_{}_{}_sizeclass.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-                parallel=args.PARALLEL,
+                parallel=parallel,
                 multi_key=args.SIZE_CLASSES
             )
         if args.UNTEMP_OUT:
             write_bedgraph_from_dict(
                 UNTEMP[strand],
                 output_filename='{}_{}_{}_untemp.mmIO.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-                parallel=args.PARALLEL,
+                parallel=parallel,
                 multi_key=args.UNTEMP_OUT
             )
     else:
         write_bedgraph_from_dict(
             ENDPOINT[strand],
             output_filename='{}_{}_{}.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-            parallel=args.PARALLEL,
+            parallel=parallel,
             multi_key=False
         )
         write_bedgraph_from_dict(
             COVERAGE[strand],
             output_filename='{}_{}_{}_coverage.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-            parallel=args.PARALLEL,
+            parallel=parallel,
             multi_key=False
         )
         if args.SIZE_CLASSES:
             write_bedgraph_from_dict(
                 READLENGTHS[strand],
                 output_filename='{}_{}_{}_sizeclass.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-                parallel=args.PARALLEL,
+                parallel=parallel,
                 multi_key=args.SIZE_CLASSES
             )
         if args.UNTEMP_OUT:
             write_bedgraph_from_dict(
                 UNTEMP[strand],
                 output_filename='{}_{}_{}_untemp.bedgraph'.format(args.SAMPLENAME,args.READTYPE,STRAND),
-                parallel=args.PARALLEL,
+                parallel=parallel,
                 multi_key=args.UNTEMP_OUT
             )
 
