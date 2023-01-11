@@ -55,10 +55,19 @@ parser.add_argument(
 parser.add_argument(
     '-C', '--cores', dest='cores', metavar='int',
     type=int, help='Number of CPU cores to use.',
-    default=6
+    default=1
+)
+parser.add_argument(
+    '--single_stream', dest='single_stream', default=False,
+    action='store_true', help='(for very large files) process bedgraph data as a single stream'
 )
 
 args = parser.parse_args()
+if args.cores < 1:
+    args.cores = 1
+
+if args.cores == 1:
+    args.single_stream = True
 
 def which(x,value=True):
     """Returns a list of locations in x that satisfy value"""
@@ -188,7 +197,7 @@ def writer(merge_filename,shared_queue,stop_token):
             return
         dest_file.write(line)
 
-def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
+def bed_find_peaks(chrom, queue=None, output=None, secondary=False, continuous=False):
     counter=1
     if chrom not in bed_dict:
         return
@@ -275,9 +284,10 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
             if score < args.threshold:
                 continue
         
-        if other:
-            queue.put(
-                '\t'.join(
+        if output is not None:
+            if other:
+                output.write(
+                    '\t'.join(
                     [
                         chrom,
                         str(start),
@@ -288,11 +298,11 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                         str(score),
                         '\t'.join(other)
                     ]
-                ) + '\n'
-            )
-        else:
-            queue.put(
-                '\t'.join(
+                    ) + '\n'
+                )
+            else:
+                output.write(
+                    '\t'.join(
                     [
                         chrom,
                         str(start),
@@ -302,8 +312,39 @@ def bed_find_peaks(chrom, queue, secondary=False, continuous=False):
                         strand,
                         str(score),
                     ]
-                ) + '\n'
-            )
+                    ) + '\n'
+                )
+        elif queue is not None:
+            if other:
+                queue.put(
+                    '\t'.join(
+                        [
+                            chrom,
+                            str(start),
+                            str(end),
+                            name,
+                            str(dompeak),
+                            strand,
+                            str(score),
+                            '\t'.join(other)
+                        ]
+                    ) + '\n'
+                )
+            else:
+                queue.put(
+                    '\t'.join(
+                        [
+                            chrom,
+                            str(start),
+                            str(end),
+                            name,
+                            str(dompeak),
+                            strand,
+                            str(score),
+                        ]
+                    ) + '\n'
+                )
+        
         counter += 1
 
 
@@ -386,28 +427,34 @@ for line in file:
 #        peak            position of peak point source (relative, 0-indexed)
 
 if __name__ == '__main__':
-    queue = mp.Queue()
-    STOP_TOKEN = "FINISHED"
-    writer_process = mp.Process(
-        target=writer,
-        args=(args.bed_out,queue,STOP_TOKEN)
-    )
-    writer_process.start()
-    all_threads = []
-    chromosomes_by_size = [
-        k for v,k in sorted(
-            [(v,k) for k,v in chromosomes.items()]
-            ,reverse=True
+    if args.single_stream:
+        out = open(args.bed_out,'w')
+        for chrom in chromosomes.keys():
+            # Find peaks for each chromosome
+            bed_find_peaks(chrom,output=out)
+    else:
+        chromosomes_by_size = [
+            k for v,k in sorted(
+                [(v,k) for k,v in chromosomes.items()]
+                ,reverse=True
+            )
+        ]
+        manager = mp.Manager()
+        queue = manager.Queue()
+        STOP_TOKEN = "FINISHED"
+        writer_process = mp.Process(
+            target=writer,
+            args=(args.bed_out,queue,STOP_TOKEN)
         )
-    ]
-    
-    pool = mp.Pool(args.cores)
-    for chrom in chromosomes_by_size:
-        # Initialize a pool of threads for each chromosome
-        pool.apply_async(bed_find_peaks, (chrom,queue))
-    
-    pool.close()
-    pool.join()
-    queue.put("FINISHED")
-    writer_process.join()
+        writer_process.start()
+        all_threads = []
+        pool = mp.Pool(args.cores)
+        for chrom in chromosomes_by_size:
+            # Initialize a pool of threads for each chromosome
+            pool.apply_async(bed_find_peaks, (chrom,queue))
+        
+        pool.close()
+        pool.join()
+        queue.put("FINISHED")
+        writer_process.join()
 

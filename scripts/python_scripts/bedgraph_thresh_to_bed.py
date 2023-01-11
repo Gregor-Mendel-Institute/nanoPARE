@@ -58,7 +58,11 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-args.single_stream = True
+if args.cores < 1:
+    args.cores = 1
+
+if args.cores == 1:
+    args.single_stream = True
 
 if args.strand in ['plus','p']:
     args.strand = '+'
@@ -243,8 +247,11 @@ if __name__ == '__main__':
         out = open(args.bed_out,'w')
         for chrom,length in chromosomes.items():
             find_bed_features(chrom, length, output=out)
+        
+        out.close()
     else:
-        queue = mp.Queue()
+        manager = mp.Manager()
+        queue = manager.Queue()
         STOP_TOKEN = "FINISHED"
         writer_process = mp.Process(
             target=writer,
@@ -268,5 +275,4 @@ if __name__ == '__main__':
         queue.put("FINISHED")
         writer_process.join()
     
-    out.close()
     
