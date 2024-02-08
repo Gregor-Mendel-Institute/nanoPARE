@@ -18,7 +18,7 @@ Software requirements:
   *STAR aligner 2.5+  
   *Python 3.6+  
   *Samtools 1.3+  
-  *Bedtools 2.26  
+  *Bedtools 2.30+  
   *Cutadapt 1.9  
   
 To download the repository, go to the desired destination folder and run:
