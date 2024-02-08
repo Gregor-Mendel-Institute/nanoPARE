@@ -35,6 +35,11 @@ parser.add_argument(
     '-L', '--lengths', type=str, default=None,
     help='filepath to output lengths table'
 )
+parser.add_argument(
+    '-C', '--cores', dest='cores', metavar='int',
+    type=int, help='Number of CPU cores to use.',
+    default=1
+)
 args = parser.parse_args()
 
 def which(x,value=True):
@@ -117,26 +122,14 @@ def write_bedgraph_from_dict(input, output_filename, digits=2, parallel=False):
             args=(output_filename,queue,STOP_TOKEN)
         )
         writer_process.start()
-        all_threads = []
-
+        pool = mp.Pool(args.cores)
         for chrom in sorted(list(input.keys())):
-            all_threads.append(
-                mp.Process(
-                    target=generate_bedgraph_lines,
-                    args=(
-                        input[chrom],
-                        chrom,
-                        queue
-                    )
-                )
-            )
-        for i in range(len(all_threads)):
-            all_threads[i].start()
-        while len(mp.active_children()) > 1:
-            time.sleep(1)
+            pool.apply_async(generate_bedgraph_lines, (input[chrom],chrom, queue))
+        
+        pool.close()
+        pool.join()
         queue.put("FINISHED")
-        while len(mp.active_children()) > 0:
-            time.sleep(1)
+        writer_process.join()
     else:
         queue = open(output_filename, 'w')
         for chrom in sorted(list(input.keys())):

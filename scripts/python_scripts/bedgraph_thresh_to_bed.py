@@ -48,12 +48,21 @@ parser.add_argument(
     choices=['+','plus','p','.','-','minus','m'], default='.'
 )
 parser.add_argument(
+    '-C', '--cores', dest='cores', metavar='int',
+    type=int, help='Number of CPU cores to use.',
+    default=1
+)
+parser.add_argument(
     '--single_stream', dest='single_stream', default=False,
     action='store_true', help='(for very large files) process bedgraph data as a single stream'
 )
 
 args = parser.parse_args()
-args.single_stream = True
+if args.cores < 1:
+    args.cores = 1
+
+if args.cores == 1:
+    args.single_stream = True
 
 if args.strand in ['plus','p']:
     args.strand = '+'
@@ -238,8 +247,11 @@ if __name__ == '__main__':
         out = open(args.bed_out,'w')
         for chrom,length in chromosomes.items():
             find_bed_features(chrom, length, output=out)
+        
+        out.close()
     else:
-        queue = mp.Queue()
+        manager = mp.Manager()
+        queue = manager.Queue()
         STOP_TOKEN = "FINISHED"
         writer_process = mp.Process(
             target=writer,
@@ -253,25 +265,14 @@ if __name__ == '__main__':
                 ,reverse=True
             )
         ]
+        pool = mp.Pool(args.cores)
         for chrom in chromosomes_by_size:
-                all_threads.append(
-                    mp.Process(
-                        target=find_bed_features,
-                        args=(
-                            chrom,
-                            chromosomes[chrom],
-                            queue
-                        )
-                    )
-                )
+            # Initialize a pool of threads for each chromosome
+            pool.apply_async(find_bed_features, (chrom,chromosomes[chrom],queue))
         
-        for i in range(len(all_threads)):
-            all_threads[i].start()
-        
-        while len(mp.active_children()) > 1:
-            time.sleep(1)
-        
+        pool.close()
+        pool.join()
         queue.put("FINISHED")
-        while len(mp.active_children()) > 0:
-            time.sleep(1)
+        writer_process.join()
+    
     

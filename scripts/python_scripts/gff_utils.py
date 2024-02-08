@@ -486,7 +486,7 @@ def get_regex_pattern(file_type):
 
     if file_type == 'gff3':
         # check if gff3 can really contain  "
-        col_pattern = re.compile(r'([A-z0-9:;,\/\|+\-=._()" ]+)')
+        col_pattern = re.compile(r'([A-z0-9:;,\/\|+\-\*=._()" ]+)')
         fields = re.compile(r'([A-z0-9:,\/\|+\-=._()" ]+)')
         field_delimiter = re.compile(r'(=)')
     if file_type == 'gtf':
